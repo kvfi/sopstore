@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+    <include resource="org/springframework/boot/logging/logback/defaults.xml"/>
+
+    <springProperty scope="context" name="appName" source="spring.application.name" defaultValue="sopstore"/>
+
+    <appender name="JSON" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder class="ch.qos.logback.classic.encoder.JsonEncoder">
+            <withMessage>true</withMessage>
+            <withThreadName>true</withThreadName>
+            <withMDC>true</withMDC>
+            <withLogger>true</withLogger>
+            <withLevel>true</withLevel>
+        </encoder>
+    </appender>
+
+    <appender name="PLAIN" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%d{ISO8601} %-5level [%X{traceId:-} %X{spanId:-} %X{tenantId:-}] %logger{36} - %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <springProfile name="saas | single-tenant">
+        <root level="INFO"><appender-ref ref="JSON"/></root>
+    </springProfile>
+
+    <springProfile name="onprem | default | test">
+        <root level="INFO"><appender-ref ref="PLAIN"/></root>
+    </springProfile>
+</configuration>

@@ -1,0 +1,14 @@
+apiVersion: v2
+name: sopstore
+description: Enterprise SOP management platform
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+keywords:
+  - sop
+  - quality
+  - compliance
+  - regulated
+home: https://github.com/rightcrowd/sopstore
+maintainers:
+  - name: RightCrowd Platform Team

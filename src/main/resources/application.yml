@@ -1,0 +1,123 @@
+spring:
+  application:
+    name: sopstore
+  profiles:
+    default: saas
+  threads:
+    virtual:
+      enabled: true
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate.format_sql: false
+      hibernate.jdbc.batch_size: 50
+      hibernate.order_inserts: true
+      hibernate.session_factory.statement_inspector: com.rightcrowd.sopstore.tenancy.internal.TenantRlsStatementInspector
+  flyway:
+    enabled: true
+    # Migrations need owner (DDL + FORCE RLS) privileges. When set, these run migrations as the
+    # schema owner while the runtime datasource connects as a non-superuser so RLS is enforced
+    # (see PerModuleFlywayMigrationStrategy). Empty by default → migrate with the app datasource.
+    url: ${FLYWAY_URL:}
+    user: ${FLYWAY_USER:}
+    password: ${FLYWAY_PASSWORD:}
+    # One Flyway instance is run per location by PerModuleFlywayMigrationStrategy, each with its own
+    # history table, so every module keeps an independent timeline starting at V001. Order is
+    # significant: it must be a topological order over cross-module foreign keys (tenancy is
+    # referenced everywhere; identity -> procedure -> lifecycle/training/execution).
+    locations:
+      - classpath:db/migration/common
+      - classpath:db/migration/tenancy
+      - classpath:db/migration/identity
+      - classpath:db/migration/procedure
+      - classpath:db/migration/lifecycle
+      - classpath:db/migration/training
+      - classpath:db/migration/execution
+      - classpath:db/migration/audit
+      - classpath:db/migration/notification
+      - classpath:db/migration/integration
+      # Cross-cutting hardening; must stay LAST so every tenant-scoped table exists
+      # before RLS is forced onto the owner role.
+      - classpath:db/migration/security
+  datasource:
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/sopstore}
+    username: ${DATABASE_USER:sopstore}
+    password: ${DATABASE_PASSWORD:sopstore}
+    hikari:
+      maximum-pool-size: 20
+      minimum-idle: 2
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+  servlet:
+    multipart:
+      max-file-size: 50MB
+      max-request-size: 50MB
+
+server:
+  port: ${PORT:8080}
+  shutdown: graceful
+  forward-headers-strategy: framework
+  servlet:
+    session:
+      cookie:
+        same-site: lax
+        http-only: true
+        secure: ${COOKIE_SECURE:false}
+      timeout: 30m
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+      base-path: /actuator
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: when-authorized
+  health:
+    livenessstate:
+      enabled: true
+    readinessstate:
+      enabled: true
+  observations:
+    annotations:
+      enabled: true
+
+sopstore:
+  deployment-mode: ${SOPSTORE_MODE:saas}
+  build-version: ${BUILD_VERSION:0.1.0}
+  storage:
+    bucket: ${SOPSTORE_BUCKET:sopstore-attachments}
+    endpoint: ${SOPSTORE_S3_ENDPOINT:http://localhost:9000}
+    access-key: ${SOPSTORE_S3_ACCESS_KEY:minio}
+    secret-key: ${SOPSTORE_S3_SECRET_KEY:miniominio}
+  security:
+    csp: "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'; font-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+    hsts-max-age: 31536000
+  session:
+    idle-timeout: PT30M
+    absolute-timeout: PT12H
+    concurrent-limit: 3
+  rate-limit:
+    login: 5/PT1M
+    api: 600/PT1M
+
+# Standalone script-service (ADR-0009). sopstore proxies the SPA's script calls to it.
+scriptservice:
+  base-url: ${SCRIPT_SERVICE_URL:http://localhost:8090}
+  service-token: ${SCRIPT_SERVICE_TOKEN:dev-script-token}
+
+logging:
+  level:
+    root: INFO
+    com.rightcrowd.sopstore: INFO
+    org.springframework.security: INFO
+    org.hibernate.SQL: WARN
+  pattern:
+    console: "%d{ISO8601} %-5level [%X{traceId:-} %X{spanId:-} %X{tenantId:-}] %logger{36} - %msg%n"

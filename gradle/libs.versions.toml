@@ -1,0 +1,87 @@
+[versions]
+java               = "25"
+springBoot         = "4.0.0"
+springDependencyMgmt = "1.1.6"
+springModulith     = "2.0.0"
+springdoc          = "2.7.0"
+flyway             = "11.1.0"
+hibernate          = "7.0.0.Final"
+postgres           = "42.7.4"
+testcontainers     = "1.20.4"
+jspecify           = "1.0.0"
+nullaway           = "0.12.1"
+errorprone         = "2.36.0"
+errorpronePlugin   = "4.1.0"
+opentelemetry      = "1.46.0"
+webauthn           = "2.6.0"
+htmx               = "2.0.4"
+checkstyle         = "10.21.0"
+spotbugs           = "6.0.27"   # spotbugs-gradle-plugin version
+spotbugsTool       = "4.9.3"    # com.github.spotbugs:spotbugs analyzer artifact
+pitest             = "1.17.4"
+archunit           = "1.3.0"
+gradle             = "9.5.1"
+
+[libraries]
+spring-boot-starter-web              = { module = "org.springframework.boot:spring-boot-starter-web" }
+spring-boot-starter-webflux          = { module = "org.springframework.boot:spring-boot-starter-webflux" }
+spring-boot-starter-data-jpa         = { module = "org.springframework.boot:spring-boot-starter-data-jpa" }
+spring-boot-starter-data-redis       = { module = "org.springframework.boot:spring-boot-starter-data-redis" }
+spring-boot-starter-security         = { module = "org.springframework.boot:spring-boot-starter-security" }
+spring-boot-starter-oauth2-client    = { module = "org.springframework.boot:spring-boot-starter-oauth2-client" }
+spring-boot-starter-oauth2-resource-server = { module = "org.springframework.boot:spring-boot-starter-oauth2-resource-server" }
+spring-boot-starter-actuator         = { module = "org.springframework.boot:spring-boot-starter-actuator" }
+spring-boot-starter-validation       = { module = "org.springframework.boot:spring-boot-starter-validation" }
+spring-boot-starter-mail             = { module = "org.springframework.boot:spring-boot-starter-mail" }
+spring-boot-starter-batch            = { module = "org.springframework.boot:spring-boot-starter-batch" }
+spring-boot-starter-integration      = { module = "org.springframework.boot:spring-boot-starter-integration" }
+spring-boot-starter-opentelemetry    = { module = "org.springframework.boot:spring-boot-starter-opentelemetry" }
+spring-boot-starter-test             = { module = "org.springframework.boot:spring-boot-starter-test" }
+spring-security-saml2-service-provider = { module = "org.springframework.security:spring-security-saml2-service-provider" }
+spring-security-test                 = { module = "org.springframework.security:spring-security-test" }
+
+spring-modulith-starter-core         = { module = "org.springframework.modulith:spring-modulith-starter-core" }
+spring-modulith-starter-jpa          = { module = "org.springframework.modulith:spring-modulith-starter-jpa" }
+spring-modulith-events-api           = { module = "org.springframework.modulith:spring-modulith-events-api" }
+spring-modulith-events-jpa           = { module = "org.springframework.modulith:spring-modulith-events-jpa" }
+spring-modulith-actuator             = { module = "org.springframework.modulith:spring-modulith-actuator" }
+spring-modulith-observability        = { module = "org.springframework.modulith:spring-modulith-observability" }
+spring-modulith-docs                 = { module = "org.springframework.modulith:spring-modulith-docs" }
+spring-modulith-test                 = { module = "org.springframework.modulith:spring-modulith-test" }
+
+springdoc-openapi-webmvc             = { module = "org.springdoc:springdoc-openapi-starter-webmvc-ui", version.ref = "springdoc" }
+
+spring-boot-flyway                   = { module = "org.springframework.boot:spring-boot-flyway" }
+flyway-core                          = { module = "org.flywaydb:flyway-core", version.ref = "flyway" }
+flyway-postgresql                    = { module = "org.flywaydb:flyway-database-postgresql", version.ref = "flyway" }
+postgres-driver                      = { module = "org.postgresql:postgresql", version.ref = "postgres" }
+
+testcontainers-postgres              = { module = "org.testcontainers:postgresql", version.ref = "testcontainers" }
+testcontainers-redis                 = { module = "com.redis:testcontainers-redis", version = "2.2.2" }
+testcontainers-minio                 = { module = "org.testcontainers:minio", version.ref = "testcontainers" }
+testcontainers-keycloak              = { module = "com.github.dasniko:testcontainers-keycloak", version = "3.4.0" }
+testcontainers-junit                 = { module = "org.testcontainers:junit-jupiter", version.ref = "testcontainers" }
+
+archunit-junit5                      = { module = "com.tngtech.archunit:archunit-junit5", version.ref = "archunit" }
+
+jspecify                             = { module = "org.jspecify:jspecify", version.ref = "jspecify" }
+nullaway                             = { module = "com.uber.nullaway:nullaway", version.ref = "nullaway" }
+errorprone-core                      = { module = "com.google.errorprone:error_prone_core", version.ref = "errorprone" }
+
+webauthn-server-core                 = { module = "com.yubico:webauthn-server-core", version.ref = "webauthn" }
+
+minio                                = { module = "io.minio:minio", version = "8.5.14" }
+jackson-datatype-jsr310              = { module = "com.fasterxml.jackson.datatype:jackson-datatype-jsr310" }
+totp                                 = { module = "dev.samstevens.totp:totp", version = "1.7.1" }
+commons-text                         = { module = "org.apache.commons:commons-text", version = "1.13.0" }
+diff-utils                           = { module = "io.github.java-diff-utils:java-diff-utils", version = "4.15" }
+poi-ooxml                            = { module = "org.apache.poi:poi-ooxml", version = "5.4.0" }
+openhtmltopdf-pdfbox                  = { module = "com.openhtmltopdf:openhtmltopdf-pdfbox", version = "1.0.10" }
+
+[plugins]
+spring-boot          = { id = "org.springframework.boot",                version.ref = "springBoot" }
+spring-dependency    = { id = "io.spring.dependency-management",         version.ref = "springDependencyMgmt" }
+errorprone           = { id = "net.ltgt.errorprone",                     version.ref = "errorpronePlugin" }
+spotbugs             = { id = "com.github.spotbugs",                     version = "6.0.27" }
+pitest               = { id = "info.solidsoft.pitest",                   version = "1.15.0" }
+node                 = { id = "com.github.node-gradle.node",             version = "7.1.0" }

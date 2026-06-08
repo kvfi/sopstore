@@ -1,0 +1,182 @@
+<!doctype html>
+<!--
+  Static preview of the redesigned procedure-authoring UI.
+  Open in any browser — no backend/login needed. It mirrors the real
+  classes/CSS from src/routes/layout.css and the [id] page markup so you can
+  judge the look. Toggle the "Read-only" switch to see the non-DRAFT state.
+-->
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<title>Procedure authoring — preview</title>
+		<style>
+			:root {
+				--color-bg: #f5f6f5;
+				--color-surface: #ffffff;
+				--color-surface-2: #fafbfa;
+				--color-ink: #18211c;
+				--color-ink-soft: #434a45;
+				--color-muted: #8a9088;
+				--color-line: #edefec;
+				--color-line-strong: #e3e6e2;
+				--color-accent: #1f9d57;
+				--color-accent-ink: #157f44;
+				--color-accent-wash: #e9f6ee;
+				--color-amber: #b5790a;
+				--color-amber-wash: #fbf1da;
+				--color-clay: #c0492f;
+				--color-clay-wash: #fae9e3;
+				--radius-card: 14px;
+				--font-sans: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+				--font-mono: ui-monospace, 'SF Mono', 'JetBrains Mono', Menlo, Consolas, monospace;
+			}
+			* { box-sizing: border-box; }
+			body { margin: 0; font-family: var(--font-sans); font-size: 14px; line-height: 1.55; color: var(--color-ink); background: var(--color-bg); -webkit-font-smoothing: antialiased; }
+			.page { max-width: 880px; margin: 0 auto; padding: 40px 28px 80px; }
+			.crumb { font-size: 13px; color: var(--color-muted); }
+			h1.t { margin: 8px 0 2px; font-size: 24px; font-weight: 700; letter-spacing: -0.01em; display: flex; align-items: center; gap: 12px; }
+			.pill { font-size: 11px; font-weight: 600; padding: 3px 10px; border-radius: 999px; background: var(--color-accent-wash); color: var(--color-accent-ink); }
+			.docno { font-family: var(--font-mono); font-size: 13px; color: var(--color-muted); }
+			.section-head { margin: 34px 0 14px; display: flex; align-items: center; gap: 12px; }
+			.section-head h2 { margin: 0; font-size: 13px; font-weight: 600; color: var(--color-ink); }
+			.save-btn { margin-left: auto; font: inherit; font-size: 12px; font-weight: 600; color: #fff; background: var(--color-accent); border: 0; border-radius: 8px; padding: 7px 13px; cursor: pointer; }
+			.save-btn:disabled { background: var(--color-line-strong); color: var(--color-muted); cursor: default; }
+
+			/* ===== copied from layout.css: authoring sheet ===== */
+			.doc-sheet { background: var(--color-surface); border: 1px solid var(--color-line); border-radius: var(--radius-card); padding: 4px 30px 28px; box-shadow: 0 1px 2px rgba(24,33,28,0.03), 0 18px 44px -30px rgba(24,33,28,0.22); }
+			.doc-block { padding: 26px 0 6px; }
+			.doc-rule { height: 1px; background: var(--color-line); margin: 0 -30px; }
+			.doc-eyebrow { display: flex; align-items: center; gap: 11px; font-size: 14px; font-weight: 640; letter-spacing: -0.01em; color: var(--color-ink); }
+			.doc-eyebrow-mark { font-family: var(--font-mono); font-size: 11px; font-weight: 600; letter-spacing: 0.03em; color: var(--color-accent-ink); background: var(--color-accent-wash); border-radius: 6px; padding: 3px 7px; }
+			.doc-hint { margin: 6px 0 15px; font-size: 12.5px; line-height: 1.5; color: var(--color-muted); }
+			.doc-field { width: 100%; font: inherit; font-size: 14px; line-height: 1.6; color: var(--color-ink); background: var(--color-surface-2); border: 1px solid var(--color-line-strong); border-radius: 11px; padding: 11px 14px; resize: vertical; transition: border-color 0.14s, box-shadow 0.14s, background 0.14s; }
+			textarea.doc-field { min-height: 76px; }
+			input.doc-field { resize: none; }
+			.doc-field::placeholder { color: #aeb4ab; }
+			.doc-field:hover:not(:disabled):not(:focus) { border-color: var(--color-muted); }
+			.doc-field:focus { outline: none; background: var(--color-surface); border-color: var(--color-accent); box-shadow: 0 0 0 3px rgba(31,157,87,0.14); }
+			.doc-field:disabled { background: var(--color-surface); color: var(--color-ink-soft); border-color: var(--color-line); cursor: default; resize: none; }
+			.prq-list { display: flex; flex-direction: column; gap: 9px; }
+			.prq-row { display: flex; align-items: center; gap: 11px; }
+			.prq-row .doc-field { flex: 1; }
+			.prq-dot { flex: none; width: 25px; height: 25px; display: grid; place-items: center; border-radius: 999px; background: var(--color-accent-wash); color: var(--color-accent-ink); font-family: var(--font-mono); font-size: 11px; font-weight: 600; }
+			.doc-muted { font-size: 13px; color: var(--color-muted); padding: 2px 0; }
+			.ctl { flex: none; width: 30px; height: 30px; display: grid; place-items: center; border-radius: 8px; border: 1px solid transparent; background: transparent; color: var(--color-muted); cursor: pointer; font-size: 14px; line-height: 1; transition: background 0.12s, color 0.12s, border-color 0.12s, opacity 0.12s; }
+			.ctl:hover:not(:disabled) { background: var(--color-surface-2); border-color: var(--color-line-strong); color: var(--color-ink-soft); }
+			.ctl:disabled { opacity: 0.28; cursor: default; }
+			.ctl.rm:hover:not(:disabled) { color: var(--color-clay); background: var(--color-clay-wash); border-color: transparent; }
+			.doc-add { margin-top: 15px; display: inline-flex; align-items: center; gap: 7px; font: inherit; font-size: 13px; font-weight: 580; color: var(--color-accent-ink); background: var(--color-accent-wash); border: 1px solid transparent; border-radius: 9px; padding: 8px 14px; cursor: pointer; transition: background 0.13s; }
+			.doc-add:hover { background: #ddf0e4; }
+			.doc-add .plus { font-size: 16px; line-height: 0; margin-top: -1px; }
+			.step-list { display: flex; flex-direction: column; gap: 12px; }
+			.step-card { border: 1px solid var(--color-line-strong); border-radius: 12px; background: var(--color-surface); overflow: hidden; transition: border-color 0.14s, box-shadow 0.14s; }
+			.step-card:focus-within { border-color: var(--color-line-strong); box-shadow: 0 14px 34px -24px rgba(24,33,28,0.45); }
+			.step-head { display: flex; align-items: center; gap: 12px; padding: 11px 13px; background: var(--color-surface-2); border-bottom: 1px solid var(--color-line); }
+			.step-num { flex: none; width: 28px; height: 28px; display: grid; place-items: center; border-radius: 8px; background: var(--color-accent); color: #fff; font-family: var(--font-mono); font-size: 12px; font-weight: 600; box-shadow: 0 2px 7px -2px rgba(31,157,87,0.55); }
+			.step-title-input { flex: 1; font: inherit; font-size: 14.5px; font-weight: 600; color: var(--color-ink); background: transparent; border: 0; padding: 5px 2px; }
+			.step-title-input::placeholder { color: var(--color-muted); font-weight: 500; }
+			.step-title-input:focus { outline: none; }
+			.step-title-input:disabled { color: var(--color-ink); }
+			.step-actions { flex: none; display: flex; gap: 2px; }
+			.step-body { padding: 14px; display: flex; flex-direction: column; gap: 13px; }
+			.step-two { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+			@media (max-width: 720px) { .step-two { grid-template-columns: 1fr; } }
+			.flabel { display: flex; flex-direction: column; gap: 6px; font-size: 10.5px; font-weight: 650; text-transform: uppercase; letter-spacing: 0.055em; color: var(--color-muted); }
+			.flabel .doc-field { font-size: 14px; font-weight: 400; text-transform: none; letter-spacing: 0; color: var(--color-ink); }
+			.flabel.warn { color: var(--color-amber); }
+			.flabel.warn .doc-field { background: var(--color-amber-wash); border-color: #ecd9ad; }
+			.flabel.warn .doc-field:focus { background: #fffdf8; border-color: var(--color-amber); box-shadow: 0 0 0 3px rgba(181,121,10,0.13); }
+
+			.toggle { position: fixed; top: 16px; right: 16px; font-size: 12px; color: var(--color-ink-soft); background: #fff; border: 1px solid var(--color-line-strong); border-radius: 9px; padding: 8px 12px; display: flex; gap: 8px; align-items: center; box-shadow: 0 8px 24px -16px rgba(0,0,0,0.3); }
+		</style>
+	</head>
+	<body>
+		<label class="toggle"><input type="checkbox" id="ro" /> Read-only (non-draft) state</label>
+		<div class="page">
+			<div class="crumb">← Procedures</div>
+			<h1 class="t">Aseptic Fill — Line 3 Changeover <span class="pill">DRAFT</span></h1>
+			<div class="docno">SOP-0042</div>
+
+			<div class="section-head">
+				<h2>Procedure document</h2>
+				<button class="save-btn" disabled>Saved</button>
+			</div>
+
+			<div class="doc-sheet">
+				<section class="doc-block">
+					<div class="doc-eyebrow"><span class="doc-eyebrow-mark">01</span> Purpose</div>
+					<p class="doc-hint">Why this procedure exists and what it sets out to achieve.</p>
+					<textarea class="doc-field" rows="3">To define the controlled steps for changing over aseptic filling Line 3 between product batches, ensuring sterility assurance and preventing cross-contamination.</textarea>
+				</section>
+				<div class="doc-rule"></div>
+
+				<section class="doc-block">
+					<div class="doc-eyebrow"><span class="doc-eyebrow-mark">02</span> Scope</div>
+					<p class="doc-hint">Who and what this applies to — roles, sites, systems, and any exclusions.</p>
+					<textarea class="doc-field" rows="3">Applies to qualified Manufacturing operators and Line Supervisors performing changeovers on Line 3 at the Cork facility. Excludes Line 1/2 and non-aseptic packaging operations.</textarea>
+				</section>
+				<div class="doc-rule"></div>
+
+				<section class="doc-block">
+					<div class="doc-eyebrow"><span class="doc-eyebrow-mark">03</span> Prerequisites</div>
+					<p class="doc-hint">Conditions, tools, or approvals required before starting.</p>
+					<div class="prq-list">
+						<div class="prq-row"><span class="prq-dot">1</span><input class="doc-field" value="Line 3 released by QA after prior batch reconciliation" /><button class="ctl rm" title="Remove">✕</button></div>
+						<div class="prq-row"><span class="prq-dot">2</span><input class="doc-field" value="Calibrated torque wrench and sterilised change parts kit available" /><button class="ctl rm" title="Remove">✕</button></div>
+						<div class="prq-row"><span class="prq-dot">3</span><input class="doc-field" value="Operators gowned per SOP-0011 and qualified within 12 months" /><button class="ctl rm" title="Remove">✕</button></div>
+					</div>
+					<button class="doc-add"><span class="plus">+</span> Add prerequisite</button>
+				</section>
+				<div class="doc-rule"></div>
+
+				<section class="doc-block">
+					<div class="doc-eyebrow"><span class="doc-eyebrow-mark">04</span> Steps</div>
+					<p class="doc-hint">The ordered actions to carry out the procedure.</p>
+					<div class="step-list">
+						<div class="step-card">
+							<div class="step-head">
+								<span class="step-num">1</span>
+								<input class="step-title-input" value="Depressurise and isolate the filling manifold" />
+								<div class="step-actions"><button class="ctl" title="Move up" disabled>↑</button><button class="ctl" title="Move down">↓</button><button class="ctl rm" title="Remove">✕</button></div>
+							</div>
+							<div class="step-body">
+								<label class="flabel">Instruction<textarea class="doc-field" rows="2">Close the supply valve, vent residual pressure to 0 bar, and lock out the manifold per the LOTO procedure.</textarea></label>
+								<div class="step-two">
+									<label class="flabel">Expected outcome<input class="doc-field" value="Gauge reads 0 bar; LOTO tag applied" /></label>
+									<label class="flabel warn">Warning<input class="doc-field" value="Do not loosen fittings before venting" /></label>
+								</div>
+							</div>
+						</div>
+						<div class="step-card">
+							<div class="step-head">
+								<span class="step-num">2</span>
+								<input class="step-title-input" value="Exchange product-contact change parts" />
+								<div class="step-actions"><button class="ctl" title="Move up">↑</button><button class="ctl" title="Move down" disabled>↓</button><button class="ctl rm" title="Remove">✕</button></div>
+							</div>
+							<div class="step-body">
+								<label class="flabel">Instruction<textarea class="doc-field" rows="2">Remove used nozzles and tubing into the waste bin; fit the sterilised kit, verifying each seal against the kit checklist.</textarea></label>
+								<div class="step-two">
+									<label class="flabel">Expected outcome<input class="doc-field" value="All seals seated; checklist signed" /></label>
+									<label class="flabel warn">Warning<input class="doc-field" placeholder="Safety / caution note" /></label>
+								</div>
+							</div>
+						</div>
+					</div>
+					<button class="doc-add"><span class="plus">+</span> Add step</button>
+				</section>
+			</div>
+		</div>
+
+		<script>
+			// Toggle read-only to preview the non-DRAFT (disabled) rendering.
+			const ro = document.getElementById('ro');
+			ro.addEventListener('change', () => {
+				const on = ro.checked;
+				document.querySelectorAll('.doc-field, .step-title-input').forEach((el) => (el.disabled = on));
+				document.querySelectorAll('.ctl, .doc-add').forEach((el) => (el.style.display = on ? 'none' : ''));
+				document.querySelector('.pill').textContent = on ? 'EFFECTIVE' : 'DRAFT';
+			});
+		</script>
+	</body>
+</html>

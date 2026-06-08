@@ -1,0 +1,20 @@
+# OIDC single sign-on against Keycloak. Activated only with the `sso` profile (e.g.
+# SPRING_PROFILES_ACTIVE=saas,sso) so the default boot needs no running IdP. The issuer is
+# fetched at startup, so Keycloak must be up when this profile is active.
+#
+#   docker compose -f deploy/docker-compose.yml --profile iam up -d keycloak
+#   ./gradlew bootRun --args='--spring.profiles.active=saas,sso'
+spring:
+  security:
+    oauth2:
+      client:
+        registration:
+          keycloak:
+            client-id: sopstore-app
+            client-secret: ${OIDC_CLIENT_SECRET:sopstore-dev-secret}
+            authorization-grant-type: authorization_code
+            scope: openid,profile,email
+        provider:
+          keycloak:
+            issuer-uri: ${OIDC_ISSUER_URI:http://localhost:8081/realms/sopstore}
+            user-name-attribute: preferred_username

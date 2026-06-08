@@ -1,0 +1,11 @@
+sopstore:
+  deployment-mode: saas
+  tenancy:
+    isolation: shared-db-with-rls
+    multi-tenant: true
+
+spring:
+  jpa:
+    properties:
+      hibernate.multiTenancy: DISCRIMINATOR
+      hibernate.tenant_identifier_resolver: com.rightcrowd.sopstore.tenancy.internal.HibernateTenantResolver

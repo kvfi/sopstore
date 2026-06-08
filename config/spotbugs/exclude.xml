@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  SpotBugs exclude filter. Empty by default: SpotBugs analyzes all code and no
+  bug patterns are suppressed. Add <Match> elements here to exclude specific
+  patterns, classes, or generated sources as the need arises.
+-->
+<FindBugsFilter>
+    <!--
+      AuthenticatedUser is a Spring Security UserDetails wrapper that must carry
+      the live User entity (it reads roles/tenant/status from it on each access).
+      Defensive-copying a JPA entity here is incorrect, so the mutable-exposure
+      checks do not apply.
+    -->
+    <Match>
+        <Class name="com.rightcrowd.sopstore.identity.AuthenticatedUser"/>
+        <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
+    </Match>
+
+    <!--
+      Spring constructor injection stores singleton beans (services/repositories) by
+      reference by design; defensive-copying an injected bean is incorrect. These
+      controllers are flagged because ProcedureService is conservatively treated as
+      mutable.
+    -->
+    <Match>
+        <Or>
+            <Class name="com.rightcrowd.sopstore.procedure.web.ProcedureWebController"/>
+            <Class name="com.rightcrowd.sopstore.procedure.api.ProcedureApiController"/>
+        </Or>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+    </Match>
+
+    <!--
+      JSON API controllers backing the SvelteKit portal. Same two reasons the
+      mutable-exposure checks don't apply: (1) injected Spring beans are stored by
+      reference by design; (2) their nested response-DTO records carry immutable
+      List.copyOf collections that are serialized straight to JSON, never mutated.
+      The regex covers each controller and its nested DTO records.
+    -->
+    <Match>
+        <Class name="~com\.rightcrowd\.sopstore\.(reporting\.DashboardApiController|lifecycle\.api\.LifecycleApiController|execution\.api\.RunsApiController|notification\.api\.NotificationsApiController|procedure\.api\.ProcedureApiController|procedure\.api\.AttachmentApiController|procedure\.internal\.AttachmentService|identity\.api\.MeController|identity\.api\.ProfileController|scripts\.api\.ScriptProxyController)(\$.*)?"/>
+        <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
+    </Match>
+</FindBugsFilter>

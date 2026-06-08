@@ -1,0 +1,28 @@
+server:
+  port: ${SCRIPT_SERVICE_PORT:8090}
+
+spring:
+  application:
+    name: script-service
+  datasource:
+    url: ${SCRIPT_DB_URL:jdbc:postgresql://localhost:5433/scriptstore}
+    username: ${SCRIPT_DB_USER:scriptstore}
+    password: ${SCRIPT_DB_PASSWORD:scriptstore}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+    properties:
+      hibernate.jdbc.time_zone: UTC
+  flyway:
+    enabled: true
+
+# Shared secret sopstore must present as X-Service-Token. Override in every real environment.
+scriptstore:
+  service-token: ${SCRIPT_SERVICE_TOKEN:dev-script-token}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info

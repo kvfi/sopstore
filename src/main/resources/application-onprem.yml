@@ -1,0 +1,22 @@
+sopstore:
+  deployment-mode: onprem
+  tenancy:
+    isolation: dedicated-db
+    multi-tenant: false
+    fixed-tenant-id: ${TENANT_ID:00000000-0000-0000-0000-000000000001}
+  airgapped: true
+
+spring:
+  jpa:
+    properties:
+      hibernate.multiTenancy: DISCRIMINATOR
+      hibernate.tenant_identifier_resolver: com.rightcrowd.sopstore.tenancy.internal.HibernateTenantResolver
+
+management:
+  otlp:
+    metrics:
+      export:
+        enabled: false
+    tracing:
+      export:
+        enabled: false

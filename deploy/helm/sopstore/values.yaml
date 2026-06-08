@@ -1,0 +1,63 @@
+replicaCount: 2
+
+image:
+  repository: sopstore
+  tag: 0.1.0
+  pullPolicy: IfNotPresent
+
+deploymentMode: saas   # saas | single-tenant | onprem
+
+service:
+  type: ClusterIP
+  port: 8080
+
+ingress:
+  enabled: false
+  className: nginx
+  host: sopstore.example.com
+  tls:
+    enabled: true
+    secretName: sopstore-tls
+
+resources:
+  requests: { cpu: "500m", memory: "1Gi" }
+  limits:   { cpu: "2",    memory: "2Gi" }
+
+database:
+  url: "jdbc:postgresql://postgres:5432/sopstore"
+  existingSecret: "sopstore-db"
+
+redis:
+  host: redis
+  port: 6379
+
+storage:
+  endpoint: "http://minio:9000"
+  existingSecret: "sopstore-s3"
+
+sessionSecret: ""        # required; overridable via --set or secret
+buildVersion: "0.1.0"
+
+otel:
+  enabled: true          # forced off in profile=onprem regardless
+  endpoint: "http://otel-collector:4317"
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 10001
+  fsGroup: 10001
+
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop: ["ALL"]
+
+probes:
+  liveness:  { path: /actuator/health/liveness,  initialDelaySeconds: 30, periodSeconds: 15 }
+  readiness: { path: /actuator/health/readiness, initialDelaySeconds: 10, periodSeconds: 5  }
+
+# Pin every image by digest in production. The strings below are placeholders.
+postgres:
+  enabled: false   # set true only if not using an external cluster
+  image: postgres:16.4@sha256:e62fbf9d3e2b49816a32c400ed2dba83e3b361e6833e624024309c35d334b412

@@ -1,0 +1,69 @@
+{
+  "realm": "sopstore",
+  "enabled": true,
+  "sslRequired": "none",
+  "roles": {
+    "realm": [
+      { "name": "QUALITY_MANAGER" },
+      { "name": "AUTHOR" },
+      { "name": "VIEWER" }
+    ]
+  },
+  "users": [
+    {
+      "username": "sso-user",
+      "email": "sso-user@example.com",
+      "emailVerified": true,
+      "firstName": "Single",
+      "lastName": "SignOn",
+      "enabled": true,
+      "credentials": [
+        { "type": "password", "value": "sso-password", "temporary": false }
+      ],
+      "realmRoles": ["QUALITY_MANAGER", "AUTHOR"],
+      "attributes": { "tenant_slug": ["acme"] }
+    }
+  ],
+  "clients": [
+    {
+      "clientId": "sopstore-app",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "secret": "sopstore-dev-secret",
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": true,
+      "redirectUris": ["http://localhost:8080/login/oauth2/code/keycloak"],
+      "webOrigins": ["http://localhost:8080"],
+      "attributes": { "post.logout.redirect.uris": "http://localhost:8080/+" },
+      "protocolMappers": [
+        {
+          "name": "realm roles",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-realm-role-mapper",
+          "config": {
+            "claim.name": "roles",
+            "jsonType.label": "String",
+            "multivalued": "true",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true"
+          }
+        },
+        {
+          "name": "tenant slug",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "config": {
+            "user.attribute": "tenant_slug",
+            "claim.name": "tenant_slug",
+            "jsonType.label": "String",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true"
+          }
+        }
+      ]
+    }
+  ]
+}

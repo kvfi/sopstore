@@ -1,0 +1,203 @@
+/* Procedure PDF theme. $ACCENT and $FOOTER are substituted by PdfExporter. */
+@page {
+	size: A4;
+	margin: 24mm 18mm 22mm 18mm;
+	@bottom-left {
+		content: "$FOOTER";
+		font-family: 'IBM Plex Sans';
+		font-size: 7pt;
+		color: #9aa0a8;
+	}
+	@bottom-right {
+		content: "Page " counter(page) " of " counter(pages);
+		font-family: 'IBM Plex Sans';
+		font-size: 7pt;
+		color: #9aa0a8;
+	}
+}
+html {
+	font-family: 'IBM Plex Sans', sans-serif;
+	font-size: $FONTPTpt;
+	color: #1c2127;
+	line-height: 1.5;
+}
+body { margin: 0; }
+.head { margin-bottom: 6px; }
+.logo { max-height: 46px; }
+.accent { height: 4px; background: $ACCENT; margin-top: 8px; }
+.meta {
+	font-family: 'IBM Plex Mono', monospace;
+	font-size: 8pt;
+	color: #6b7280;
+	margin-top: 14px;
+	letter-spacing: 0.02em;
+}
+/* Confidentiality marking in the document meta line. */
+.classification { color: #b3261e; font-weight: 700; letter-spacing: 0.05em; }
+h1 { font-size: $H1PTpt; font-weight: 700; color: $ACCENT; margin: 4px 0 2px; }
+h2 {
+	font-size: $H2PTpt;
+	font-weight: 600;
+	color: $ACCENT;
+	margin: 20px 0 7px;
+	border-bottom: 1px solid #e1e4e8;
+	padding-bottom: 3px;
+}
+h3 { font-size: $H3PTpt; font-weight: 600; margin: 10px 0 4px; }
+p { margin: 0 0 7px; }
+ul, ol { margin: 0 0 7px; padding-left: 18px; }
+li { margin: 0 0 2px; }
+a { color: $ACCENT; text-decoration: none; }
+code {
+	font-family: 'IBM Plex Mono', monospace;
+	background: #f1f3f5;
+	padding: 0 3px;
+	border-radius: 3px;
+	font-size: 9pt;
+}
+pre {
+	font-family: 'IBM Plex Mono', monospace;
+	background: #f6f7f9;
+	padding: 8px;
+	border-radius: 4px;
+	font-size: 9pt;
+	white-space: pre-wrap;
+}
+/* Syntax-highlighted fenced code block: a language label above the source. */
+.code {
+	margin: 6px 0 8px;
+	border: 1px solid #e2e6ea;
+	border-radius: 4px;
+}
+.code-lang {
+	font-family: 'IBM Plex Mono', monospace;
+	font-size: 7.5pt;
+	text-transform: uppercase;
+	letter-spacing: 0.05em;
+	color: #6b7280;
+	background: #f3f5f7;
+	padding: 2px 8px;
+	border-bottom: 1px solid #e2e6ea;
+}
+.code pre {
+	margin: 0;
+	background: #fbfcfd;
+	border-radius: 0 0 4px 4px;
+	padding: 8px 10px;
+	color: #1f2933;
+}
+.tok-kw { color: #8250df; font-weight: 600; }
+.tok-str { color: #0a7d33; }
+.tok-com { color: #8a929b; font-style: italic; }
+.tok-num { color: #b35200; }
+blockquote {
+	margin: 0 0 7px;
+	padding-left: 10px;
+	border-left: 3px solid #d0d4d9;
+	color: #3d4752;
+}
+.muted { color: #9aa0a8; font-style: italic; }
+.chip {
+	font-family: 'IBM Plex Mono', monospace;
+	font-size: 8.5pt;
+	background: #eef1f4;
+	border: 1px solid #d0d4d9;
+	border-radius: 9px;
+	padding: 1px 6px;
+}
+.step { margin: 0 0 12px; padding-bottom: 7px; border-bottom: 1px solid #eef0f2; }
+.step-h { margin-bottom: 3px; }
+.num {
+	display: inline-block;
+	width: 20px;
+	height: 20px;
+	line-height: 20px;
+	text-align: center;
+	background: $ACCENT;
+	color: #fff;
+	border-radius: 10px;
+	font-size: 8.5pt;
+	font-weight: 600;
+	vertical-align: middle;
+	margin-right: 7px;
+}
+.type {
+	font-family: 'IBM Plex Mono', monospace;
+	font-size: 8pt;
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+	color: $ACCENT;
+	margin: 0 8px 0 5px;
+	vertical-align: middle;
+}
+.title { font-weight: 600; vertical-align: middle; }
+/* "Script" icon: an accent play triangle drawn with borders (no icon font / SVG plugin needed). */
+.ico-script {
+	display: inline-block;
+	width: 0;
+	height: 0;
+	margin: 0 5px 0 0;
+	border-style: solid;
+	border-width: 3.5px 0 3.5px 6px;
+	border-color: transparent transparent transparent $ACCENT;
+	vertical-align: middle;
+}
+/* Clickable reference to the pinned script inside the unzipped bundle (scripts/…). Sits inline
+   next to the RUN SCRIPT label in the step header. */
+.script-link {
+	font-family: 'IBM Plex Mono', monospace;
+	font-size: 8.5pt;
+	color: $ACCENT;
+	background: #eef1f4;
+	border: 1px solid #d0d4d9;
+	border-radius: 9px;
+	padding: 1px 6px;
+	text-decoration: underline;
+	vertical-align: middle;
+}
+.script-none { font-size: 8.5pt; color: #9aa0a8; font-style: italic; vertical-align: middle; }
+.sep { color: #c0c4c8; margin: 0 6px; vertical-align: middle; }
+.desc { margin-left: 28px; }
+
+/* table of contents */
+.toc {
+	margin: 16px 0 6px;
+	padding: 12px 14px;
+	background: #f6f7f9;
+	border: 1px solid #e1e4e8;
+	border-radius: 5px;
+}
+.toc-h {
+	font-size: 8pt;
+	font-weight: 600;
+	text-transform: uppercase;
+	letter-spacing: 0.06em;
+	color: #6b7280;
+	margin-bottom: 6px;
+}
+.toc-row { margin: 2px 0; }
+.toc-row a { text-decoration: none; color: #1c2127; }
+.toc-row a::after {
+	content: leader('.') target-counter(attr(href), page);
+	color: #6b7280;
+}
+
+/* version history / change log */
+table.hist { width: 100%; border-collapse: collapse; font-size: $TABLEPTpt; }
+table.hist th, table.hist td {
+	text-align: left;
+	padding: 4px 8px;
+	border-bottom: 1px solid #e8eaed;
+	vertical-align: top;
+}
+table.hist th {
+	font-size: 8pt;
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+	color: #6b7280;
+}
+.cur {
+	font-family: 'IBM Plex Mono', monospace;
+	font-size: 7.5pt;
+	color: $ACCENT;
+}
