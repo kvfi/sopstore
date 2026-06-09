@@ -14,13 +14,17 @@ import java.nio.charset.StandardCharsets;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayDeque;
+import java.util.ArrayList;
 import java.util.Base64;
 import java.util.Deque;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 import org.jspecify.annotations.Nullable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Renders a procedure to a styled PDF via HTML/CSS (openhtmltopdf + PDFBox). The structured body
@@ -30,6 +34,7 @@ import org.jspecify.annotations.Nullable;
  */
 final class PdfExporter {
 
+  private static final Logger LOG = LoggerFactory.getLogger(PdfExporter.class);
   private static final ObjectMapper JSON = new ObjectMapper();
   private static final String DEFAULT_ACCENT = "215db0";
   private static final String SANS = "IBM Plex Sans";
@@ -47,12 +52,46 @@ final class PdfExporter {
       @Nullable DocTemplate template,
       List<ProcedureVersion> history,
       Map<UUID, String> authorNames,
-      @Nullable String confidentiality) {
+      @Nullable String confidentiality,
+      ScriptBundleConfig bundleConfig) {
     JsonNode body = parse(bodyJson);
     String accent = "#" + (template == null ? DEFAULT_ACCENT : template.accentColor());
-    String xhtml =
-        buildXhtml(p, version, body, template, accent, history, authorNames, confidentiality);
 
+    // Try the template's custom HTML first (if any); a render failure drops to the built-in layout.
+    String custom = null;
+    if (template != null) {
+      String html = template.customHtml();
+      if (html != null && !html.isBlank()) {
+        try {
+          custom =
+              PdfTemplateEngine.render(
+                  html,
+                  context(
+                      p, version, body, template, accent, history, authorNames, confidentiality,
+                      bundleConfig));
+        } catch (RuntimeException e) {
+          LOG.warn("custom PDF template failed to render; falling back to the built-in layout", e);
+        }
+      }
+    }
+
+    String builtin =
+        buildXhtml(
+            p, version, body, template, accent, history, authorNames, confidentiality,
+            bundleConfig);
+    if (custom == null) {
+      return renderPdf(builtin);
+    }
+    try {
+      return renderPdf(custom);
+    } catch (RuntimeException e) {
+      LOG.warn("custom PDF template produced invalid output; using the built-in layout", e);
+      return renderPdf(builtin);
+    }
+  }
+
+  /** Runs the HTML/CSS through openhtmltopdf with the embedded Plex fonts and returns PDF bytes. */
+  private static byte[] renderPdf(String xhtml) {
     try (ByteArrayOutputStream out = new ByteArrayOutputStream()) {
       PdfRendererBuilder b = new PdfRendererBuilder();
       b.useFastMode();
@@ -65,7 +104,7 @@ final class PdfExporter {
       b.run();
       return out.toByteArray();
     } catch (Exception e) {
-      throw new IllegalStateException("failed to export procedure to pdf", e);
+      throw new IllegalStateException("failed to render pdf", e);
     }
   }
 
@@ -90,10 +129,13 @@ final class PdfExporter {
       String accent,
       List<ProcedureVersion> history,
       Map<UUID, String> authorNames,
-      @Nullable String confidentiality) {
+      @Nullable String confidentiality,
+      ScriptBundleConfig bundleConfig) {
     StringBuilder sb = new StringBuilder(4096);
+    String custom = template == null ? "" : template.customCss();
     sb.append("<html><head><style>")
-        .append(css(accent, template, confidentiality))
+        .append(builtinCss(accent, template, confidentiality))
+        .append(custom == null || custom.isBlank() ? "" : "\n/* custom */\n" + custom)
         .append("</style></head><body>");
 
     // Header: optional logo + accent rule.
@@ -135,36 +177,122 @@ final class PdfExporter {
     }
     sb.append("</div>");
 
-    h2(sb, 1).append(textBlock(body.path("purpose").asText("")));
-    h2(sb, 2).append(textBlock(body.path("scope").asText("")));
-    h2(sb, 3).append(prerequisites(body.path("prerequisites")));
-
-    h2(sb, 4);
-    JsonNode steps = body.path("steps");
-    if (steps.isArray() && !steps.isEmpty()) {
-      int n = 1;
-      for (JsonNode s : steps) {
-        sb.append(step(s, n++));
-      }
-    } else {
-      sb.append("<p class=\"muted\">No steps authored yet.</p>");
-    }
-
-    h2(sb, 5).append(historyTable(history, version, authorNames));
+    sb.append(defaultBody(body, version, history, authorNames, bundleConfig));
 
     sb.append("</body></html>");
     return sb.toString();
   }
 
-  /** Appends a numbered, anchored section heading, e.g. {@code <h2 id="sec-3">3. ...</h2>}. */
-  private static StringBuilder h2(StringBuilder sb, int n) {
-    return sb.append("<h2 id=\"sec-")
-        .append(n)
-        .append("\">")
-        .append(n)
-        .append(". ")
-        .append(esc(SECTIONS[n - 1]))
-        .append("</h2>");
+  /**
+   * The five numbered content sections (Purpose → Document history). Shared by the built-in layout
+   * and exposed to custom templates as {@code {{{defaultBody}}}} so a template can restyle the page
+   * shell without re-implementing the body.
+   */
+  private static String defaultBody(
+      JsonNode body,
+      @Nullable ProcedureVersion version,
+      List<ProcedureVersion> history,
+      Map<UUID, String> authorNames,
+      ScriptBundleConfig bundleConfig) {
+    StringBuilder sb = new StringBuilder(2048);
+    sb.append(h2str(1)).append(textBlock(body.path("purpose").asText("")));
+    sb.append(h2str(2)).append(textBlock(body.path("scope").asText("")));
+    sb.append(h2str(3)).append(prerequisites(body.path("prerequisites")));
+
+    sb.append(h2str(4));
+    JsonNode steps = body.path("steps");
+    if (steps.isArray() && !steps.isEmpty()) {
+      int n = 1;
+      for (JsonNode s : steps) {
+        sb.append(step(s, n++, bundleConfig));
+      }
+    } else {
+      sb.append("<p class=\"muted\">No steps authored yet.</p>");
+    }
+
+    sb.append(h2str(5)).append(historyTable(history, version, authorNames));
+    return sb.toString();
+  }
+
+  /** Builds the Mustache context a custom PDF template renders against. */
+  private static Map<String, Object> context(
+      Procedure p,
+      @Nullable ProcedureVersion version,
+      JsonNode body,
+      DocTemplate template,
+      String accent,
+      List<ProcedureVersion> history,
+      Map<UUID, String> authorNames,
+      @Nullable String confidentiality,
+      ScriptBundleConfig bundleConfig) {
+    Map<String, Object> m = new HashMap<>();
+    m.put("title", p.title());
+    m.put("documentNumber", p.documentNumber());
+    m.put("version", version == null ? "—" : version.versionLabel());
+    m.put("state", p.state());
+    m.put(
+        "confidentiality",
+        confidentiality == null ? "" : confidentiality.toUpperCase(Locale.ROOT));
+    m.put("accent", accent);
+    boolean hasLogo = template.hasLogo();
+    m.put("hasLogo", hasLogo);
+    m.put("logoDataUri", hasLogo ? logoDataUri(template) : "");
+    m.put("footer", footerText(template, confidentiality));
+    m.put("builtinCss", builtinCss(accent, template, confidentiality));
+    m.put("customCss", template.customCss());
+    m.put("purposeHtml", textBlock(body.path("purpose").asText("")));
+    m.put("scopeHtml", textBlock(body.path("scope").asText("")));
+    m.put("prerequisitesHtml", prerequisites(body.path("prerequisites")));
+    m.put("historyHtml", historyTable(history, version, authorNames));
+    m.put("defaultBody", defaultBody(body, version, history, authorNames, bundleConfig));
+    m.put("steps", stepContexts(body.path("steps"), bundleConfig));
+    return m;
+  }
+
+  /** Per-step values for the {@code {{#steps}}} loop: scalars plus pre-rendered HTML fragments. */
+  private static List<Map<String, Object>> stepContexts(
+      JsonNode steps, ScriptBundleConfig bundleConfig) {
+    List<Map<String, Object>> list = new ArrayList<>();
+    if (!steps.isArray()) {
+      return list;
+    }
+    int n = 1;
+    for (JsonNode s : steps) {
+      String type = s.path("type").asText("");
+      boolean runScript = "RUN_SCRIPT".equals(type);
+      Map<String, Object> m = new HashMap<>();
+      int number = n++;
+      m.put("number", number);
+      m.put("title", s.path("title").asText(""));
+      m.put("typeLabel", stepTypeLabel(type));
+      m.put("isRunScript", runScript);
+      m.put("scriptName", s.path("scriptName").asText(""));
+      m.put(
+          "scriptHref",
+          runScript
+              ? ScriptBundleNaming.scriptHref(
+                  bundleConfig,
+                  s.path("scriptRefCode").asText(""),
+                  s.path("scriptName").asText(""),
+                  s.path("scriptVersionNo").asInt(0),
+                  s.path("scriptLanguage").asText(""))
+              : "");
+      m.put("descriptionHtml", html(s.path("description")));
+      m.put("html", step(s, number, bundleConfig));
+      list.add(m);
+    }
+    return list;
+  }
+
+  /** The base64 data-URI for the template's logo image. */
+  private static String logoDataUri(DocTemplate template) {
+    String mime = template.logoMime() == null ? "image/png" : template.logoMime();
+    return "data:" + mime + ";base64," + Base64.getEncoder().encodeToString(template.logo());
+  }
+
+  /** A numbered, anchored section heading, e.g. {@code <h2 id="sec-3">3. Prerequisites</h2>}. */
+  private static String h2str(int n) {
+    return "<h2 id=\"sec-" + n + "\">" + n + ". " + esc(SECTIONS[n - 1]) + "</h2>";
   }
 
   /** The version history / change log table, newest first, with the authoring user per version. */
@@ -228,7 +356,7 @@ final class PdfExporter {
     return "<p class=\"muted\">No prerequisites.</p>";
   }
 
-  private static String step(JsonNode s, int n) {
+  private static String step(JsonNode s, int n, ScriptBundleConfig bundleConfig) {
     String type = s.path("type").asText("ACTION");
     boolean runScript = "RUN_SCRIPT".equals(type);
     String typeLabel = stepTypeLabel(type);
@@ -243,7 +371,7 @@ final class PdfExporter {
     if (runScript) {
       // The pinned script's name sits right next to the RUN SCRIPT label as the clickable
       // reference; a title is optional and only shown when one is explicitly set.
-      sb.append(scriptReference(s));
+      sb.append(scriptReference(s, bundleConfig));
       if (!title.isBlank()) {
         sb.append("<span class=\"sep\">&#183;</span>");
         sb.append("<span class=\"title\">").append(esc(title)).append("</span>");
@@ -279,7 +407,7 @@ final class PdfExporter {
    * hyperlink into the bundle's {@code scripts/} directory so the reader can open the exact script
    * from the unzipped SOP bundle.
    */
-  private static String scriptReference(JsonNode s) {
+  private static String scriptReference(JsonNode s, ScriptBundleConfig bundleConfig) {
     String scriptName = s.path("scriptName").asText("");
     String code = s.path("scriptRefCode").asText("");
     int ver = s.path("scriptVersionNo").asInt(0);
@@ -291,7 +419,7 @@ final class PdfExporter {
     String name = scriptName.isBlank() ? scriptRef : scriptName;
     String label = name + (ver > 0 ? " @ v" + ver : "");
     String language = s.path("scriptLanguage").asText("");
-    String href = ScriptBundleNaming.path(code, scriptName, ver, language);
+    String href = ScriptBundleNaming.scriptHref(bundleConfig, code, scriptName, ver, language);
     return "<a class=\"script-link\" href=\"" + escAttr(href) + "\">" + esc(label) + "</a>";
   }
 
@@ -412,8 +540,9 @@ final class PdfExporter {
   }
 
   // ----------------------------------------------------------------- CSS
-  private static String css(
-      String accent, @Nullable DocTemplate template, @Nullable String confidentiality) {
+  /** Composes the page footer: optional template footer, the controlled-copy notice, and class. */
+  private static String footerText(
+      @Nullable DocTemplate template, @Nullable String confidentiality) {
     String footer =
         template == null || template.footerText() == null || template.footerText().isBlank()
             ? "Controlled document — printed copies are uncontrolled."
@@ -421,6 +550,12 @@ final class PdfExporter {
     if (confidentiality != null && !confidentiality.isBlank()) {
       footer = confidentiality.toUpperCase(Locale.ROOT) + "  —  " + footer;
     }
+    return footer;
+  }
+
+  /** The built-in stylesheet with the template's accent, fonts, and footer substituted in. */
+  private static String builtinCss(
+      String accent, @Nullable DocTemplate template, @Nullable String confidentiality) {
     double bodyPt = template == null ? 10 : template.bodyFontPt();
     double headingPt = template == null ? 12 : template.headingFontPt();
     double tablePt = template == null ? 9.5 : template.tableFontPt();
@@ -433,7 +568,7 @@ final class PdfExporter {
         .replace("$H2PT", fmtPt(headingPt))
         .replace("$H3PT", fmtPt(Math.max(7, headingPt - 1)))
         .replace("$TABLEPT", fmtPt(tablePt))
-        .replace("$FOOTER", esc(cssString(footer)));
+        .replace("$FOOTER", esc(cssString(footerText(template, confidentiality))));
   }
 
   /** Formats a point size, dropping a trailing {@code .0} so whole sizes read as integers. */

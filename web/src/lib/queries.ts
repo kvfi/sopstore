@@ -25,6 +25,15 @@ export type ExportTemplate = {
 	headingFontPt: number;
 	tableFontPt: number;
 	hasLogo: boolean;
+	customCss: string;
+	customHtml: string;
+};
+
+export type ScriptBundleSettings = {
+	bundleFolder: string;
+	filenamePattern: string;
+	bundleName: string;
+	linkBaseUrl: string;
 };
 
 /*
@@ -165,6 +174,7 @@ export const qk = {
 	runs: ['runs'] as const,
 	notifications: ['notifications'] as const,
 	exportTemplates: ['exportTemplates'] as const,
+	scriptBundleSettings: ['scriptBundleSettings'] as const,
 	notificationPrefs: ['notificationPrefs'] as const,
 	scripts: ['scripts'] as const,
 	script: (id: string) => ['scripts', id] as const,
@@ -209,6 +219,20 @@ export const useNotifications = () =>
 
 export const useExportTemplates = () =>
 	useQuery({ queryKey: qk.exportTemplates, queryFn: () => api.get<ExportTemplate[]>('/api/v1/export-templates') });
+
+export const useScriptBundleSettings = () =>
+	useQuery({
+		queryKey: qk.scriptBundleSettings,
+		queryFn: () => api.get<ScriptBundleSettings>('/api/v1/script-bundle-settings')
+	});
+
+export function useSaveScriptBundleSettings() {
+	const qc = useQueryClient();
+	return useMutation({
+		mutationFn: (v: ScriptBundleSettings) => api.put<ScriptBundleSettings>('/api/v1/script-bundle-settings', v),
+		onSuccess: () => qc.invalidateQueries({ queryKey: qk.scriptBundleSettings })
+	});
+}
 
 // ---- scripts (proxied to the standalone script-service) ----
 export const useScripts = () =>
@@ -456,6 +480,8 @@ type TemplateInput = {
 	bodyFontPt: number;
 	headingFontPt: number;
 	tableFontPt: number;
+	customCss?: string;
+	customHtml?: string;
 };
 
 export function useCreateTemplate() {
@@ -476,7 +502,9 @@ export function useUpdateTemplate() {
 				footerText: v.footerText,
 				bodyFontPt: v.bodyFontPt,
 				headingFontPt: v.headingFontPt,
-				tableFontPt: v.tableFontPt
+				tableFontPt: v.tableFontPt,
+				customCss: v.customCss,
+				customHtml: v.customHtml
 			}),
 		onSuccess: () => qc.invalidateQueries({ queryKey: qk.exportTemplates })
 	});

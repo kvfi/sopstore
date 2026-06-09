@@ -34,6 +34,7 @@ public class AttachmentService {
   private final AttachmentContentRepository contents;
   private final ProcedureService procedureService;
   private final ScriptContentPort scriptContent;
+  private final ScriptBundleSettingsService bundleSettings;
 
   /** Creates the service with its repositories, the procedure service, and script-content port. */
   public AttachmentService(
@@ -41,12 +42,14 @@ public class AttachmentService {
       AttachmentRepository attachments,
       AttachmentContentRepository contents,
       ProcedureService procedureService,
-      ScriptContentPort scriptContent) {
+      ScriptContentPort scriptContent,
+      ScriptBundleSettingsService bundleSettings) {
     this.procedures = procedures;
     this.attachments = attachments;
     this.contents = contents;
     this.procedureService = procedureService;
     this.scriptContent = scriptContent;
+    this.bundleSettings = bundleSettings;
   }
 
   /** Attachment metadata as the API exposes it. */
@@ -128,8 +131,10 @@ public class AttachmentService {
           zip.closeEntry();
         }
       }
-      // The pinned scripts each RUN_SCRIPT step runs, under scripts/ — matching the PDF's links.
-      writeScripts(zip, procedureService.bodyOrEmpty(procedureId));
+      // The pinned scripts each RUN_SCRIPT step runs, under the configured folder — matching the
+      // PDF's links.
+      ScriptBundleConfig cfg = bundleSettings.effectiveConfig();
+      writeScripts(zip, procedureService.bodyOrEmpty(procedureId), cfg);
       zip.finish();
       return out.toByteArray();
     } catch (Exception e) {
@@ -137,13 +142,21 @@ public class AttachmentService {
     }
   }
 
+  /** Returns the filename for a procedure's downloaded bundle, per the tenant's bundle settings. */
+  @Transactional(readOnly = true)
+  public String bundleFileName(UUID procedureId) {
+    String doc = procedures.findById(procedureId).map(Procedure::documentNumber).orElse("sop");
+    return ScriptBundleNaming.bundleFileName(bundleSettings.effectiveConfig(), doc);
+  }
+
   /**
-   * Writes each RUN_SCRIPT step's pinned script@version into {@code scripts/}, fetched from the
-   * script-service. Entries are named by {@link ScriptBundleNaming} so they line up with the
+   * Writes each RUN_SCRIPT step's pinned script@version into the configured bundle folder, fetched
+   * from the script-service. Entries are named by {@link ScriptBundleNaming} so they line up with
    * hyperlinks in the exported PDF. Duplicate references are written once; a script the service
    * can't supply is silently skipped (the bundle still builds without the optional service).
    */
-  private void writeScripts(ZipOutputStream zip, String bodyJson) throws IOException {
+  private void writeScripts(ZipOutputStream zip, String bodyJson, ScriptBundleConfig cfg)
+      throws IOException {
     JsonNode steps;
     try {
       steps = JSON.readTree(bodyJson == null || bodyJson.isBlank() ? "{}" : bodyJson).path("steps");
@@ -162,6 +175,7 @@ public class AttachmentService {
       int ver = s.path("scriptVersionNo").asInt(0);
       String path =
           ScriptBundleNaming.path(
+              cfg,
               s.path("scriptRefCode").asText(""),
               s.path("scriptName").asText(""),
               ver,

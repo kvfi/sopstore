@@ -14,6 +14,7 @@ const GROUPS: Group[] = [
 			{ to: '/settings/configuration/prerequisite-types', label: 'Prerequisite types', icon: 'tag' },
 			{ to: '/settings/configuration/prerequisites', label: 'Prerequisites', icon: 'list' },
 			{ to: '/settings/configuration/export-templates', label: 'Export templates', icon: 'document' },
+			{ to: '/settings/configuration/script-bundles', label: 'Script bundles', icon: 'archive' },
 			{ to: '/settings/configuration/confidentiality-levels', label: 'Confidentiality levels', icon: 'shield' }
 		]
 	}

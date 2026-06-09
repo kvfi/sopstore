@@ -14,6 +14,7 @@ import PrerequisiteTypes from './pages/settings/PrerequisiteTypes';
 import Prerequisites from './pages/settings/Prerequisites';
 import ExportTemplates from './pages/settings/ExportTemplates';
 import ConfidentialityLevels from './pages/settings/ConfidentialityLevels';
+import ScriptBundleSettingsPage from './pages/settings/ScriptBundleSettings';
 
 export default function App() {
 	return (
@@ -34,6 +35,7 @@ export default function App() {
 						<Route path="configuration/prerequisite-types" element={<PrerequisiteTypes />} />
 						<Route path="configuration/prerequisites" element={<Prerequisites />} />
 						<Route path="configuration/export-templates" element={<ExportTemplates />} />
+						<Route path="configuration/script-bundles" element={<ScriptBundleSettingsPage />} />
 						<Route path="configuration/confidentiality-levels" element={<ConfidentialityLevels />} />
 					</Route>
 				</Route>

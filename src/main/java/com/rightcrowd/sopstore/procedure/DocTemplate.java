@@ -52,6 +52,12 @@ public class DocTemplate {
   @Column(name = "logo_mime")
   private @Nullable String logoMime;
 
+  @Column(name = "custom_css", nullable = false)
+  private String customCss = "";
+
+  @Column(name = "custom_html", nullable = false)
+  private String customHtml = "";
+
   @Column(name = "created_at", nullable = false)
   private Instant createdAt = Instant.now();
 
@@ -118,6 +124,16 @@ public class DocTemplate {
     return logo.clone();
   }
 
+  /** Returns the custom CSS appended after the built-in stylesheet (empty when none). */
+  public String customCss() {
+    return customCss;
+  }
+
+  /** Returns the custom full-page HTML template (empty when the built-in layout is used). */
+  public String customHtml() {
+    return customHtml;
+  }
+
   /** Renames the template. */
   public void setName(String name) {
     this.name = name;
@@ -152,6 +168,16 @@ public class DocTemplate {
   public void setLogo(byte[] bytes, @Nullable String mime) {
     this.logo = bytes.clone();
     this.logoMime = mime;
+  }
+
+  /** Sets the custom CSS (null is stored as empty). */
+  public void setCustomCss(@Nullable String css) {
+    this.customCss = css == null ? "" : css;
+  }
+
+  /** Sets the custom full-page HTML template (null is stored as empty). */
+  public void setCustomHtml(@Nullable String html) {
+    this.customHtml = html == null ? "" : html;
   }
 
   /** Strips a leading '#' and lower-cases; falls back to the brand blue when blank/invalid. */

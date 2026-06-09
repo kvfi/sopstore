@@ -2,6 +2,7 @@ package com.rightcrowd.sopstore.procedure.api;
 
 import com.rightcrowd.sopstore.procedure.DocTemplate;
 import com.rightcrowd.sopstore.procedure.internal.DocTemplateRepository;
+import com.rightcrowd.sopstore.procedure.internal.PdfTemplateService;
 import com.rightcrowd.sopstore.tenancy.TenantContext;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import java.io.IOException;
@@ -13,6 +14,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -33,10 +35,12 @@ import org.springframework.web.multipart.MultipartFile;
 public class DocTemplateController {
 
   private final DocTemplateRepository repo;
+  private final PdfTemplateService templates;
 
-  /** Creates the controller with its repository. */
-  public DocTemplateController(DocTemplateRepository repo) {
+  /** Creates the controller with its repository and template (validate/preview) service. */
+  public DocTemplateController(DocTemplateRepository repo, PdfTemplateService templates) {
     this.repo = repo;
+    this.templates = templates;
   }
 
   /** API representation of a template (logo bytes are fetched separately). */
@@ -48,7 +52,9 @@ public class DocTemplateController {
       double bodyFontPt,
       double headingFontPt,
       double tableFontPt,
-      boolean hasLogo) {
+      boolean hasLogo,
+      String customCss,
+      String customHtml) {
     static Dto from(DocTemplate t) {
       return new Dto(
           t.id(),
@@ -58,7 +64,9 @@ public class DocTemplateController {
           t.bodyFontPt(),
           t.headingFontPt(),
           t.tableFontPt(),
-          t.hasLogo());
+          t.hasLogo(),
+          t.customCss(),
+          t.customHtml());
     }
   }
 
@@ -69,7 +77,9 @@ public class DocTemplateController {
       @Nullable String footerText,
       @Nullable Double bodyFontPt,
       @Nullable Double headingFontPt,
-      @Nullable Double tableFontPt) {}
+      @Nullable Double tableFontPt,
+      @Nullable String customCss,
+      @Nullable String customHtml) {}
 
   /** Lists the tenant's export templates. */
   @GetMapping
@@ -85,6 +95,7 @@ public class DocTemplateController {
     if (name.isEmpty()) {
       return ResponseEntity.badRequest().build();
     }
+    templates.validateHtml(req.customHtml());
     DocTemplate t =
         new DocTemplate(
             UUID.randomUUID(),
@@ -92,7 +103,7 @@ public class DocTemplateController {
             name,
             req.accentColor() == null ? "" : req.accentColor(),
             req.footerText());
-    applyFontSizes(t, req);
+    applyEditable(t, req);
     try {
       return ResponseEntity.status(201).body(Dto.from(repo.save(t)));
     } catch (DataIntegrityViolationException e) {
@@ -112,10 +123,11 @@ public class DocTemplateController {
     if (name.isEmpty()) {
       return ResponseEntity.badRequest().build();
     }
+    templates.validateHtml(req.customHtml());
     t.setName(name);
     t.setAccentColor(req.accentColor() == null ? "" : req.accentColor());
     t.setFooterText(req.footerText());
-    applyFontSizes(t, req);
+    applyEditable(t, req);
     try {
       return ResponseEntity.ok(Dto.from(repo.save(t)));
     } catch (DataIntegrityViolationException e) {
@@ -123,8 +135,8 @@ public class DocTemplateController {
     }
   }
 
-  /** Applies any supplied font sizes (body/heading/table); the entity clamps each to its range. */
-  private static void applyFontSizes(DocTemplate t, SaveRequest req) {
+  /** Applies the supplied font sizes (clamped by the entity) and the custom CSS/HTML overrides. */
+  private static void applyEditable(DocTemplate t, SaveRequest req) {
     if (req.bodyFontPt() != null) {
       t.setBodyFontPt(req.bodyFontPt());
     }
@@ -134,6 +146,30 @@ public class DocTemplateController {
     if (req.tableFontPt() != null) {
       t.setTableFontPt(req.tableFontPt());
     }
+    if (req.customCss() != null) {
+      t.setCustomCss(req.customCss());
+    }
+    if (req.customHtml() != null) {
+      t.setCustomHtml(req.customHtml());
+    }
+  }
+
+  /** A custom HTML template that failed to compile — surface the reason as a 400. */
+  @ExceptionHandler(IllegalArgumentException.class)
+  public ResponseEntity<String> invalidTemplate(IllegalArgumentException e) {
+    return ResponseEntity.badRequest().body(e.getMessage());
+  }
+
+  /** Renders a sample PDF with this template so its CSS/HTML can be previewed standalone. */
+  @PostMapping("/{id}/preview")
+  public ResponseEntity<byte[]> preview(@PathVariable UUID id) {
+    DocTemplate t = repo.findById(id).orElse(null);
+    if (t == null) {
+      return ResponseEntity.notFound().build();
+    }
+    return ResponseEntity.ok()
+        .contentType(MediaType.APPLICATION_PDF)
+        .body(templates.preview(t));
   }
 
   /** Deletes a template. Procedures referencing it fall back to the default export style. */

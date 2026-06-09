@@ -77,6 +77,7 @@ commons-text                         = { module = "org.apache.commons:commons-te
 diff-utils                           = { module = "io.github.java-diff-utils:java-diff-utils", version = "4.15" }
 poi-ooxml                            = { module = "org.apache.poi:poi-ooxml", version = "5.4.0" }
 openhtmltopdf-pdfbox                  = { module = "com.openhtmltopdf:openhtmltopdf-pdfbox", version = "1.0.10" }
+jmustache                            = { module = "com.samskivert:jmustache", version = "1.16" }
 
 [plugins]
 spring-boot          = { id = "org.springframework.boot",                version.ref = "springBoot" }

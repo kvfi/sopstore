@@ -73,6 +73,7 @@ dependencies {
     implementation(libs.commons.text)
     implementation(libs.diff.utils)
     implementation(libs.openhtmltopdf.pdfbox) // styled PDF export of procedures (HTML/CSS → PDF)
+    implementation(libs.jmustache) // per-template custom HTML rendering for the PDF export
     implementation(libs.webauthn.server.core)
 
     // Nullness

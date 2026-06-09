@@ -97,6 +97,31 @@ export async function upload<T>(path: string, file: File): Promise<T> {
 	return (await res.json()) as T;
 }
 
+/** POSTs and returns the binary response as a Blob (e.g. a generated PDF). Adds CSRF. */
+export async function postBlob(path: string): Promise<Blob> {
+	await primeCsrf();
+	const t = cookie('XSRF-TOKEN');
+	const res = await fetch(path, {
+		method: 'POST',
+		headers: { 'X-Requested-With': 'XMLHttpRequest', ...(t ? { 'X-XSRF-TOKEN': t } : {}) },
+		credentials: 'same-origin'
+	});
+	if (res.status === 401) {
+		toSignIn();
+		throw new ApiError(401, 'Not authenticated');
+	}
+	if (!res.ok) {
+		let msg = res.statusText;
+		try {
+			msg = (await res.text()) || msg;
+		} catch {
+			/* ignore */
+		}
+		throw new ApiError(res.status, msg);
+	}
+	return res.blob();
+}
+
 /** Form-login against Spring, returning clean status (handler sends 204/401 for XHR). */
 export async function login(username: string, password: string): Promise<void> {
 	await primeCsrf();

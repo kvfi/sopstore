@@ -1,6 +1,18 @@
 import { useRef, useState, type ChangeEvent } from 'react';
-import { Button, Card, HTMLTable, InputGroup, Spinner } from '@blueprintjs/core';
-import { ApiError } from '../../lib/api';
+import {
+	Button,
+	Callout,
+	Card,
+	Code,
+	Dialog,
+	DialogBody,
+	DialogFooter,
+	HTMLTable,
+	InputGroup,
+	Spinner,
+	TextArea
+} from '@blueprintjs/core';
+import { ApiError, postBlob } from '../../lib/api';
 import { toast } from '../../lib/toaster';
 import {
 	type ExportTemplate,
@@ -10,6 +22,8 @@ import {
 	useDeleteTemplate,
 	useUploadTemplateLogo
 } from '../../lib/queries';
+
+type AssetKind = 'css' | 'html';
 
 type Draft = {
 	name: string;
@@ -37,6 +51,8 @@ export default function ExportTemplates() {
 	const [logoVer, setLogoVer] = useState(0); // cache-busts the logo <img> after re-upload
 	const fileInput = useRef<HTMLInputElement>(null);
 	const [logoTarget, setLogoTarget] = useState<string | null>(null);
+	const [editing, setEditing] = useState<{ id: string; kind: AssetKind } | null>(null);
+	const editTemplate = editing ? templates.find((t) => t.id === editing.id) : undefined;
 
 	const draftFor = (t: ExportTemplate): Draft =>
 		drafts[t.id] ?? {
@@ -122,7 +138,11 @@ export default function ExportTemplates() {
 		<>
 			<p className="page-sub">
 				PDF-export themes: a name, an accent colour (title + headings), optional footer text, and a
-				logo. Authors pick a template per procedure for its <strong>Download PDF</strong> output.
+				logo. Per template you can also add <strong>custom CSS</strong> (restyles the built-in
+				layout) and a full <strong>custom HTML</strong> page template — use the{' '}
+				<strong>style</strong> and <strong>code</strong> buttons on each row, then{' '}
+				<strong>Preview PDF</strong>. Authors pick a template per procedure for its{' '}
+				<strong>Download PDF</strong> output.
 			</p>
 
 			<input ref={fileInput} type="file" accept="image/*" style={{ display: 'none' }} onChange={onLogoFile} />
@@ -230,6 +250,22 @@ export default function ExportTemplates() {
 												<Button small minimal icon="upload" onClick={() => pickLogo(t.id)} aria-label="Upload logo" />
 											</td>
 											<td className="right nowrap">
+												<Button
+													small
+													minimal
+													icon="style"
+													intent={t.customCss ? 'primary' : 'none'}
+													title="Custom CSS"
+													onClick={() => setEditing({ id: t.id, kind: 'css' })}
+												/>
+												<Button
+													small
+													minimal
+													icon="code"
+													intent={t.customHtml ? 'primary' : 'none'}
+													title="Custom HTML template"
+													onClick={() => setEditing({ id: t.id, kind: 'html' })}
+												/>{' '}
 												<Button small minimal intent="primary" disabled={!dirty} onClick={() => save(t)} text="Save" />{' '}
 												<Button small minimal intent="danger" icon="trash" onClick={() => remove(t)} />
 											</td>
@@ -297,6 +333,153 @@ export default function ExportTemplates() {
 					</p>
 				</Card>
 			)}
+
+			{editing && editTemplate && (
+				<AssetDialog
+					template={editTemplate}
+					kind={editing.kind}
+					onClose={() => setEditing(null)}
+				/>
+			)}
 		</>
+	);
+}
+
+/** Editor for a template's custom CSS or full HTML page template: edit, upload, download, preview. */
+function AssetDialog({
+	template,
+	kind,
+	onClose
+}: {
+	template: ExportTemplate;
+	kind: AssetKind;
+	onClose: () => void;
+}) {
+	const update = useUpdateTemplate();
+	const [text, setText] = useState(kind === 'css' ? template.customCss : template.customHtml);
+	const fileRef = useRef<HTMLInputElement>(null);
+	const [previewing, setPreviewing] = useState(false);
+
+	const persist = () =>
+		update.mutateAsync({
+			id: template.id,
+			name: template.name,
+			accentColor: hex(template.accentColor),
+			footerText: template.footerText ?? '',
+			bodyFontPt: template.bodyFontPt,
+			headingFontPt: template.headingFontPt,
+			tableFontPt: template.tableFontPt,
+			customCss: kind === 'css' ? text : template.customCss,
+			customHtml: kind === 'html' ? text : template.customHtml
+		});
+
+	async function save() {
+		try {
+			await persist();
+			toast('Saved', 'success');
+			onClose();
+		} catch (e) {
+			toast((e as Error).message, 'danger');
+		}
+	}
+
+	async function preview() {
+		setPreviewing(true);
+		try {
+			await persist(); // the preview renders the saved template
+			const blob = await postBlob(`/api/v1/export-templates/${template.id}/preview`);
+			const url = URL.createObjectURL(blob);
+			window.open(url, '_blank', 'noopener');
+			setTimeout(() => URL.revokeObjectURL(url), 60000);
+		} catch (e) {
+			toast((e as Error).message, 'danger');
+		} finally {
+			setPreviewing(false);
+		}
+	}
+
+	async function onFile(e: ChangeEvent<HTMLInputElement>) {
+		const f = e.target.files?.[0];
+		if (f) setText(await f.text());
+		if (fileRef.current) fileRef.current.value = '';
+	}
+
+	function download() {
+		const blob = new Blob([text], { type: kind === 'css' ? 'text/css' : 'text/html' });
+		const url = URL.createObjectURL(blob);
+		const a = document.createElement('a');
+		a.href = url;
+		a.download = `${template.name || 'template'}.${kind === 'css' ? 'css' : 'html'}`;
+		a.click();
+		URL.revokeObjectURL(url);
+	}
+
+	return (
+		<Dialog
+			isOpen
+			onClose={onClose}
+			title={`${kind === 'css' ? 'Custom CSS' : 'Custom HTML template'} — ${template.name}`}
+			style={{ width: 860 }}
+		>
+			<DialogBody>
+				{kind === 'css' ? (
+					<Callout intent="primary" icon="style" style={{ marginBottom: 10 }}>
+						Appended after the built-in stylesheet, so your rules win. Target classes such as{' '}
+						<Code>h1</Code>, <Code>h2</Code>, <Code>.toc</Code>, <Code>.script-link</Code>,{' '}
+						<Code>table.hist</Code>. Leave empty to keep the defaults.
+					</Callout>
+				) : (
+					<Callout intent="primary" icon="code" style={{ marginBottom: 10 }}>
+						Full page template (Mustache). Scalars: <Code>{'{{title}}'}</Code>,{' '}
+						<Code>{'{{documentNumber}}'}</Code>, <Code>{'{{version}}'}</Code>,{' '}
+						<Code>{'{{state}}'}</Code>, <Code>{'{{confidentiality}}'}</Code>,{' '}
+						<Code>{'{{accent}}'}</Code>, <Code>{'{{logoDataUri}}'}</Code>,{' '}
+						<Code>{'{{footer}}'}</Code>. Raw blocks: <Code>{'{{{builtinCss}}}'}</Code>,{' '}
+						<Code>{'{{{customCss}}}'}</Code>, <Code>{'{{{defaultBody}}}'}</Code>,{' '}
+						<Code>{'{{{purposeHtml}}}'}</Code>, <Code>{'{{{scopeHtml}}}'}</Code>,{' '}
+						<Code>{'{{{prerequisitesHtml}}}'}</Code>, <Code>{'{{{historyHtml}}}'}</Code>. Loop:{' '}
+						<Code>{'{{#steps}}'}</Code> … <Code>{'{{/steps}}'}</Code> with <Code>number</Code>,{' '}
+						<Code>title</Code>, <Code>typeLabel</Code>, <Code>isRunScript</Code>,{' '}
+						<Code>scriptName</Code>, <Code>scriptHref</Code>, <Code>{'{{{descriptionHtml}}}'}</Code>,{' '}
+						<Code>{'{{{html}}}'}</Code>. Empty = built-in layout; a broken template falls back
+						automatically.
+					</Callout>
+				)}
+				<TextArea
+					value={text}
+					onChange={(e) => setText(e.currentTarget.value)}
+					fill
+					style={{ minHeight: 340, fontFamily: 'monospace', fontSize: 12, whiteSpace: 'pre' }}
+					placeholder={
+						kind === 'css'
+							? '.doc-title { color: #0a7; }\nh2 { border-bottom: 2px solid {{accent}}; }'
+							: '<html><head><style>{{{builtinCss}}} {{{customCss}}}</style></head>\n<body>{{{defaultBody}}}</body></html>'
+					}
+				/>
+				<input
+					ref={fileRef}
+					type="file"
+					accept={kind === 'css' ? '.css,text/css' : '.html,.htm,text/html'}
+					style={{ display: 'none' }}
+					onChange={onFile}
+				/>
+			</DialogBody>
+			<DialogFooter
+				actions={
+					<>
+						<Button icon="upload" text="Upload file" onClick={() => fileRef.current?.click()} />
+						<Button icon="download" text="Download" onClick={download} />
+						<Button icon="eye-open" text="Preview PDF" loading={previewing} onClick={preview} />
+						<Button
+							intent="primary"
+							icon="floppy-disk"
+							text="Save"
+							loading={update.isPending}
+							onClick={save}
+						/>
+					</>
+				}
+			/>
+		</Dialog>
 	);
 }

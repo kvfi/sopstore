@@ -66,7 +66,16 @@ class PdfExporterTest {
     t.setLogo(PNG_1X1, "image/png");
     t.setBodyFontPt(9.5);
 
-    byte[] pdf = PdfExporter.export(procedure(), v2, BODY, t, List.of(v2, v1), Map.of(), "Confidential");
+    byte[] pdf =
+        PdfExporter.export(
+            procedure(),
+            v2,
+            BODY,
+            t,
+            List.of(v2, v1),
+            Map.of(),
+            "Confidential",
+            ScriptBundleConfig.DEFAULTS);
 
     assertThat(header(pdf)).isEqualTo("%PDF-");
     assertThat(pdf.length).isGreaterThan(2000);
@@ -74,7 +83,9 @@ class PdfExporterTest {
 
   @Test
   void rendersWithoutTemplateOrBody() {
-    byte[] pdf = PdfExporter.export(procedure(), null, "{}", null, List.of(), Map.of(), null);
+    byte[] pdf =
+        PdfExporter.export(
+            procedure(), null, "{}", null, List.of(), Map.of(), null, ScriptBundleConfig.DEFAULTS);
     assertThat(header(pdf)).isEqualTo("%PDF-");
   }
 }

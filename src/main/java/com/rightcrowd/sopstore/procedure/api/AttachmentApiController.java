@@ -3,7 +3,6 @@ package com.rightcrowd.sopstore.procedure.api;
 import com.rightcrowd.sopstore.procedure.internal.AttachmentService;
 import com.rightcrowd.sopstore.procedure.internal.AttachmentService.AttachmentFile;
 import com.rightcrowd.sopstore.procedure.internal.AttachmentService.AttachmentMeta;
-import com.rightcrowd.sopstore.procedure.internal.ProcedureRepository;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -31,12 +30,10 @@ import org.springframework.web.multipart.MultipartFile;
 public class AttachmentApiController {
 
   private final AttachmentService attachments;
-  private final ProcedureRepository procedures;
 
-  /** Creates the controller with the attachment service and procedure repository. */
-  public AttachmentApiController(AttachmentService attachments, ProcedureRepository procedures) {
+  /** Creates the controller with the attachment service. */
+  public AttachmentApiController(AttachmentService attachments) {
     this.attachments = attachments;
-    this.procedures = procedures;
   }
 
   /** Lists the procedure's attachments. */
@@ -79,15 +76,10 @@ public class AttachmentApiController {
   @GetMapping("/bundle.zip")
   public ResponseEntity<Resource> bundle(@PathVariable UUID id) {
     byte[] zip = attachments.bundleZip(id);
-    String doc =
-        procedures
-            .findById(id)
-            .map(p -> p.documentNumber())
-            .orElse("sop")
-            .replaceAll("[^A-Za-z0-9._-]", "_");
+    String filename = attachments.bundleFileName(id);
     return ResponseEntity.ok()
         .contentType(MediaType.parseMediaType("application/zip"))
-        .header(HttpHeaders.CONTENT_DISPOSITION, attachmentDisposition(doc + "-bundle.zip"))
+        .header(HttpHeaders.CONTENT_DISPOSITION, attachmentDisposition(filename))
         .body(new ByteArrayResource(zip));
   }
 

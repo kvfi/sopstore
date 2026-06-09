@@ -43,6 +43,7 @@ public class ProcedureService {
   private final DocTemplateRepository docTemplates;
   private final ConfidentialityLevelRepository confidentialityLevels;
   private final UserDirectory users;
+  private final ScriptBundleSettingsService bundleSettings;
 
   /** Creates the service with its repositories, allocator, event publisher, and user directory. */
   public ProcedureService(
@@ -53,7 +54,8 @@ public class ProcedureService {
       ApplicationEventPublisher events,
       DocTemplateRepository docTemplates,
       ConfidentialityLevelRepository confidentialityLevels,
-      UserDirectory users) {
+      UserDirectory users,
+      ScriptBundleSettingsService bundleSettings) {
     this.procedures = procedures;
     this.versions = versions;
     this.steps = steps;
@@ -62,6 +64,7 @@ public class ProcedureService {
     this.docTemplates = docTemplates;
     this.confidentialityLevels = confidentialityLevels;
     this.users = users;
+    this.bundleSettings = bundleSettings;
   }
 
   /** A prerequisite line ({@code type} + {@code text}) to seed into a new procedure's body. */
@@ -207,7 +210,14 @@ public class ProcedureService {
     Map<UUID, String> authorNames = authorNames(history, version);
     String confidentiality = confidentialityName(procedureId);
     return PdfExporter.export(
-        p, version, body, templateFromBody(body), history, authorNames, confidentiality);
+        p,
+        version,
+        body,
+        templateFromBody(body),
+        history,
+        authorNames,
+        confidentiality,
+        bundleSettings.effectiveConfig());
   }
 
   /** Resolves each version author's display name once, for the PDF document-history table. */
