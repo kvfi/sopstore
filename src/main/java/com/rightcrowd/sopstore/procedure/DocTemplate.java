@@ -58,6 +58,30 @@ public class DocTemplate {
   @Column(name = "custom_html", nullable = false)
   private String customHtml = "";
 
+  @Column(name = "font_family", nullable = false)
+  private String fontFamily = "IBM Plex Sans";
+
+  @Column(name = "body_font", nullable = false)
+  private byte[] bodyFont = new byte[0];
+
+  @Column(name = "body_font_name")
+  private @Nullable String bodyFontName;
+
+  @Column(name = "cover_enabled", nullable = false)
+  private boolean coverEnabled = false;
+
+  @Column(name = "cover_text", nullable = false)
+  private String coverText = "";
+
+  @Column(name = "cover_align", nullable = false)
+  private String coverAlign = "bottom";
+
+  @Column(name = "cover_html", nullable = false)
+  private String coverHtml = "";
+
+  @Column(name = "cover_logo_size", nullable = false)
+  private String coverLogoSize = "medium";
+
   @Column(name = "created_at", nullable = false)
   private Instant createdAt = Instant.now();
 
@@ -134,6 +158,55 @@ public class DocTemplate {
     return customHtml;
   }
 
+  /** Returns the body/heading font family name (defaults to {@code IBM Plex Sans}). */
+  public String fontFamily() {
+    return fontFamily;
+  }
+
+  /** Whether a custom body font file has been uploaded for {@link #fontFamily()}. */
+  public boolean hasBodyFont() {
+    return bodyFont.length > 0;
+  }
+
+  /** Returns a copy of the uploaded body font bytes (empty when none). */
+  public byte[] bodyFont() {
+    return bodyFont.clone();
+  }
+
+  /** Returns the uploaded body font's original file name, or null when none. */
+  public @Nullable String bodyFontName() {
+    return bodyFontName;
+  }
+
+  /** Whether a back cover page is rendered as the last page of the export. */
+  public boolean coverEnabled() {
+    return coverEnabled;
+  }
+
+  /** Returns the customizable cover-page text (empty when none). */
+  public String coverText() {
+    return coverText;
+  }
+
+  /** Returns the cover-page vertical alignment: {@code top}, {@code middle}, or {@code bottom}. */
+  public String coverAlign() {
+    return coverAlign;
+  }
+
+  /**
+   * Returns the custom cover-page HTML template (Mustache), or empty to use the built-in cover
+   * markup. Rendered only when {@link #coverEnabled()} is set.
+   */
+  public String coverHtml() {
+    return coverHtml;
+  }
+
+  /** Returns the cover logo size keyword: {@code small}, {@code medium}, {@code large}, or
+   * {@code xlarge}. Drives the {@code {{{logo}}}} image's CSS size class. */
+  public String coverLogoSize() {
+    return coverLogoSize;
+  }
+
   /** Renames the template. */
   public void setName(String name) {
     this.name = name;
@@ -180,6 +253,49 @@ public class DocTemplate {
     this.customHtml = html == null ? "" : html;
   }
 
+  /** Sets the font family name (blank/null falls back to {@code IBM Plex Sans}). */
+  public void setFontFamily(@Nullable String family) {
+    String f = family == null ? "" : family.trim();
+    this.fontFamily = f.isEmpty() ? "IBM Plex Sans" : f;
+  }
+
+  /** Replaces the uploaded body font bytes and its original file name. */
+  public void setBodyFont(byte[] bytes, @Nullable String name) {
+    this.bodyFont = bytes.clone();
+    this.bodyFontName = name;
+  }
+
+  /** Clears any uploaded body font, reverting to the bundled IBM Plex Sans. */
+  public void clearBodyFont() {
+    this.bodyFont = new byte[0];
+    this.bodyFontName = null;
+  }
+
+  /** Enables or disables the back cover page. */
+  public void setCoverEnabled(boolean enabled) {
+    this.coverEnabled = enabled;
+  }
+
+  /** Sets the cover-page text (null is stored as empty). */
+  public void setCoverText(@Nullable String text) {
+    this.coverText = text == null ? "" : text;
+  }
+
+  /** Sets the cover-page vertical alignment (defaults to {@code bottom} when blank/invalid). */
+  public void setCoverAlign(@Nullable String align) {
+    this.coverAlign = normalizeAlign(align);
+  }
+
+  /** Sets the custom cover-page HTML template (null is stored as empty). */
+  public void setCoverHtml(@Nullable String html) {
+    this.coverHtml = html == null ? "" : html;
+  }
+
+  /** Sets the cover logo size (defaults to {@code medium} when blank/invalid). */
+  public void setCoverLogoSize(@Nullable String size) {
+    this.coverLogoSize = normalizeLogoSize(size);
+  }
+
   /** Strips a leading '#' and lower-cases; falls back to the brand blue when blank/invalid. */
   private static String normalizeColor(@Nullable String c) {
     if (c == null) {
@@ -187,5 +303,29 @@ public class DocTemplate {
     }
     String h = c.startsWith("#") ? c.substring(1) : c;
     return h.matches("[0-9a-fA-F]{6}") ? h.toLowerCase(Locale.ROOT) : "215db0";
+  }
+
+  /** Restricts the cover alignment to a valid table-cell vertical-align keyword. */
+  private static String normalizeAlign(@Nullable String a) {
+    if (a == null) {
+      return "bottom";
+    }
+    String v = a.trim().toLowerCase(Locale.ROOT);
+    return switch (v) {
+      case "top", "middle", "bottom" -> v;
+      default -> "bottom";
+    };
+  }
+
+  /** Restricts the cover logo size to a known keyword (used directly in a CSS class name). */
+  private static String normalizeLogoSize(@Nullable String s) {
+    if (s == null) {
+      return "medium";
+    }
+    String v = s.trim().toLowerCase(Locale.ROOT);
+    return switch (v) {
+      case "small", "medium", "large", "xlarge" -> v;
+      default -> "medium";
+    };
   }
 }

@@ -7,6 +7,7 @@ import com.openhtmltopdf.pdfboxout.PdfRendererBuilder;
 import com.rightcrowd.sopstore.procedure.DocTemplate;
 import com.rightcrowd.sopstore.procedure.Procedure;
 import com.rightcrowd.sopstore.procedure.ProcedureVersion;
+import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -80,18 +81,18 @@ final class PdfExporter {
             p, version, body, template, accent, history, authorNames, confidentiality,
             bundleConfig);
     if (custom == null) {
-      return renderPdf(builtin);
+      return renderPdf(builtin, template);
     }
     try {
-      return renderPdf(custom);
+      return renderPdf(custom, template);
     } catch (RuntimeException e) {
       LOG.warn("custom PDF template produced invalid output; using the built-in layout", e);
-      return renderPdf(builtin);
+      return renderPdf(builtin, template);
     }
   }
 
   /** Runs the HTML/CSS through openhtmltopdf with the embedded Plex fonts and returns PDF bytes. */
-  private static byte[] renderPdf(String xhtml) {
+  private static byte[] renderPdf(String xhtml, @Nullable DocTemplate template) {
     try (ByteArrayOutputStream out = new ByteArrayOutputStream()) {
       PdfRendererBuilder b = new PdfRendererBuilder();
       b.useFastMode();
@@ -100,6 +101,15 @@ final class PdfExporter {
       b.useFont(() -> font("IBMPlexSans-SemiBold.ttf"), SANS, 600, FontStyle.NORMAL, true);
       b.useFont(() -> font("IBMPlexSans-Bold.ttf"), SANS, 700, FontStyle.NORMAL, true);
       b.useFont(() -> font("IBMPlexMono-Regular.ttf"), MONO, 400, FontStyle.NORMAL, true);
+      // An uploaded body font is registered under its family name for every weight the theme uses
+      // (the same file serves regular and bold; the engine picks the nearest available weight).
+      if (template != null && template.hasBodyFont()) {
+        byte[] f = template.bodyFont();
+        String fam = template.fontFamily();
+        b.useFont(() -> new ByteArrayInputStream(f), fam, 400, FontStyle.NORMAL, true);
+        b.useFont(() -> new ByteArrayInputStream(f), fam, 600, FontStyle.NORMAL, true);
+        b.useFont(() -> new ByteArrayInputStream(f), fam, 700, FontStyle.NORMAL, true);
+      }
       b.toStream(out);
       b.run();
       return out.toByteArray();
@@ -178,9 +188,92 @@ final class PdfExporter {
     sb.append("</div>");
 
     sb.append(defaultBody(body, version, history, authorNames, bundleConfig));
+    sb.append(coverPage(p, version, template, accent, confidentiality));
 
     sb.append("</body></html>");
     return sb.toString();
+  }
+
+  /**
+   * The optional back cover page, forced onto a fresh last page. When the template supplies custom
+   * cover HTML it is rendered (Mustache) against {@link #coverContext}; a blank or broken template
+   * falls back to {@link #defaultCover}. Returns an empty string when the cover is not enabled.
+   */
+  private static String coverPage(
+      Procedure p,
+      @Nullable ProcedureVersion version,
+      @Nullable DocTemplate template,
+      String accent,
+      @Nullable String confidentiality) {
+    if (template == null || !template.coverEnabled()) {
+      return "";
+    }
+    String tmpl = template.coverHtml();
+    if (tmpl != null && !tmpl.isBlank()) {
+      try {
+        return PdfTemplateEngine.render(
+            tmpl, coverContext(p, version, template, accent, confidentiality));
+      } catch (RuntimeException e) {
+        LOG.warn("custom cover template failed to render; using the built-in cover", e);
+      }
+    }
+    return defaultCover(template);
+  }
+
+  /** The built-in cover markup: the logo above the cover text, inside the page-fitting wrapper. */
+  private static String defaultCover(DocTemplate template) {
+    StringBuilder sb = new StringBuilder(256);
+    sb.append("<div class=\"cover\"><div class=\"cover-cell\">");
+    sb.append(logoImgTag(template));
+    String text = template.coverText();
+    if (text != null && !text.isBlank()) {
+      sb.append("<h5>").append(esc(text).replace("\n", "<br/>")).append("</h5>");
+    }
+    return sb.append("</div></div>").toString();
+  }
+
+  /** The Mustache context a custom cover template renders against (doc meta + cover fields). */
+  private static Map<String, Object> coverContext(
+      Procedure p,
+      @Nullable ProcedureVersion version,
+      DocTemplate template,
+      String accent,
+      @Nullable String confidentiality) {
+    Map<String, Object> m = new HashMap<>();
+    m.put("title", p.title());
+    m.put("documentNumber", p.documentNumber());
+    m.put("version", version == null ? "—" : version.versionLabel());
+    m.put("state", p.state());
+    m.put(
+        "confidentiality",
+        confidentiality == null ? "" : confidentiality.toUpperCase(Locale.ROOT));
+    m.put("accent", accent);
+    boolean hasLogo = template.hasLogo();
+    m.put("hasLogo", hasLogo);
+    m.put("logo", logoImgTag(template));
+    m.put("logoDataUri", hasLogo ? logoDataUri(template) : "");
+    m.put("logoSize", template.coverLogoSize());
+    m.put("footer", footerText(template, confidentiality));
+    m.put("coverAlign", template.coverAlign());
+    m.put("coverText", template.coverText());
+    m.put("coverTextHtml", esc(template.coverText()).replace("\n", "<br/>"));
+    return m;
+  }
+
+  /**
+   * A ready-to-use cover logo {@code <img>} tag sized by the template's {@code coverLogoSize()} (an
+   * {@code .cover-logo-<size>} CSS class), or an empty string when no logo is set. Exposed to cover
+   * templates as {@code {{{logo}}}} and used by the built-in cover.
+   */
+  private static String logoImgTag(DocTemplate template) {
+    if (!template.hasLogo()) {
+      return "";
+    }
+    return "<img class=\"cover-logo cover-logo-"
+        + template.coverLogoSize()
+        + "\" src=\""
+        + logoDataUri(template)
+        + "\" />";
   }
 
   /**
@@ -246,6 +339,9 @@ final class PdfExporter {
     m.put("historyHtml", historyTable(history, version, authorNames));
     m.put("defaultBody", defaultBody(body, version, history, authorNames, bundleConfig));
     m.put("steps", stepContexts(body.path("steps"), bundleConfig));
+    m.put("coverEnabled", template.coverEnabled());
+    m.put("coverText", template.coverText());
+    m.put("coverPage", coverPage(p, version, template, accent, confidentiality));
     return m;
   }
 
@@ -563,12 +659,31 @@ final class PdfExporter {
     // Footer sits in a CSS string inside <style>, so escape for CSS then for XML.
     return readResource("/pdf/procedure.css")
         .replace("$ACCENT", accent)
+        .replace("$FONTFAMILY", fontStack(template))
         .replace("$FONTPT", fmtPt(bodyPt))
         .replace("$H1PT", fmtPt(headingPt + 9))
         .replace("$H2PT", fmtPt(headingPt))
         .replace("$H3PT", fmtPt(Math.max(7, headingPt - 1)))
         .replace("$TABLEPT", fmtPt(tablePt))
+        .replace("$COVERVALIGN", template == null ? "bottom" : template.coverAlign())
         .replace("$FOOTER", esc(cssString(footerText(template, confidentiality))));
+  }
+
+  /**
+   * The {@code font-family} stack for body text and headings. An uploaded font is named first (it
+   * is registered under {@code fontFamily()} in {@link #renderPdf}); the bundled IBM Plex Sans is
+   * always kept as the fallback so a missing or partial font still renders.
+   */
+  private static String fontStack(@Nullable DocTemplate template) {
+    if (template == null || !template.hasBodyFont()) {
+      return "'" + SANS + "', sans-serif";
+    }
+    return "'" + cssIdent(template.fontFamily()) + "', '" + SANS + "', sans-serif";
+  }
+
+  /** Sanitises a font family name for use inside a CSS string (drops quotes/backslashes). */
+  private static String cssIdent(String s) {
+    return s.replace("\\", "").replace("'", "").replace("\"", "");
   }
 
   /** Formats a point size, dropping a trailing {@code .0} so whole sizes read as integers. */

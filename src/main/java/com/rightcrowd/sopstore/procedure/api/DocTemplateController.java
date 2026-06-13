@@ -43,7 +43,7 @@ public class DocTemplateController {
     this.templates = templates;
   }
 
-  /** API representation of a template (logo bytes are fetched separately). */
+  /** API representation of a template (logo and font bytes are fetched/uploaded separately). */
   public record Dto(
       UUID id,
       String name,
@@ -54,7 +54,15 @@ public class DocTemplateController {
       double tableFontPt,
       boolean hasLogo,
       String customCss,
-      String customHtml) {
+      String customHtml,
+      String fontFamily,
+      boolean hasBodyFont,
+      @Nullable String bodyFontName,
+      boolean coverEnabled,
+      String coverText,
+      String coverAlign,
+      String coverHtml,
+      String coverLogoSize) {
     static Dto from(DocTemplate t) {
       return new Dto(
           t.id(),
@@ -66,7 +74,15 @@ public class DocTemplateController {
           t.tableFontPt(),
           t.hasLogo(),
           t.customCss(),
-          t.customHtml());
+          t.customHtml(),
+          t.fontFamily(),
+          t.hasBodyFont(),
+          t.bodyFontName(),
+          t.coverEnabled(),
+          t.coverText(),
+          t.coverAlign(),
+          t.coverHtml(),
+          t.coverLogoSize());
     }
   }
 
@@ -79,7 +95,13 @@ public class DocTemplateController {
       @Nullable Double headingFontPt,
       @Nullable Double tableFontPt,
       @Nullable String customCss,
-      @Nullable String customHtml) {}
+      @Nullable String customHtml,
+      @Nullable String fontFamily,
+      @Nullable Boolean coverEnabled,
+      @Nullable String coverText,
+      @Nullable String coverAlign,
+      @Nullable String coverHtml,
+      @Nullable String coverLogoSize) {}
 
   /** Lists the tenant's export templates. */
   @GetMapping
@@ -96,6 +118,7 @@ public class DocTemplateController {
       return ResponseEntity.badRequest().build();
     }
     templates.validateHtml(req.customHtml());
+    templates.validateHtml(req.coverHtml());
     DocTemplate t =
         new DocTemplate(
             UUID.randomUUID(),
@@ -124,6 +147,7 @@ public class DocTemplateController {
       return ResponseEntity.badRequest().build();
     }
     templates.validateHtml(req.customHtml());
+    templates.validateHtml(req.coverHtml());
     t.setName(name);
     t.setAccentColor(req.accentColor() == null ? "" : req.accentColor());
     t.setFooterText(req.footerText());
@@ -151,6 +175,24 @@ public class DocTemplateController {
     }
     if (req.customHtml() != null) {
       t.setCustomHtml(req.customHtml());
+    }
+    if (req.fontFamily() != null) {
+      t.setFontFamily(req.fontFamily());
+    }
+    if (req.coverEnabled() != null) {
+      t.setCoverEnabled(req.coverEnabled());
+    }
+    if (req.coverText() != null) {
+      t.setCoverText(req.coverText());
+    }
+    if (req.coverAlign() != null) {
+      t.setCoverAlign(req.coverAlign());
+    }
+    if (req.coverHtml() != null) {
+      t.setCoverHtml(req.coverHtml());
+    }
+    if (req.coverLogoSize() != null) {
+      t.setCoverLogoSize(req.coverLogoSize());
     }
   }
 
@@ -205,5 +247,31 @@ public class DocTemplateController {
     return ResponseEntity.ok()
         .contentType(MediaType.parseMediaType(mime == null || mime.isBlank() ? "image/png" : mime))
         .body(t.logo());
+  }
+
+  /** Uploads (replaces) the template's body font file (TTF). It is embedded in the export. */
+  @PostMapping("/{id}/font")
+  @PreAuthorize("hasRole('TENANT_ADMIN')")
+  public ResponseEntity<Dto> uploadFont(
+      @PathVariable UUID id, @RequestParam("file") MultipartFile file) throws IOException {
+    DocTemplate t = repo.findById(id).orElse(null);
+    if (t == null) {
+      return ResponseEntity.notFound().build();
+    }
+    String filename = file.getOriginalFilename();
+    t.setBodyFont(file.getBytes(), filename == null || filename.isBlank() ? "font.ttf" : filename);
+    return ResponseEntity.ok(Dto.from(repo.save(t)));
+  }
+
+  /** Removes the uploaded body font, reverting to the bundled IBM Plex Sans. */
+  @DeleteMapping("/{id}/font")
+  @PreAuthorize("hasRole('TENANT_ADMIN')")
+  public ResponseEntity<Dto> clearFont(@PathVariable UUID id) {
+    DocTemplate t = repo.findById(id).orElse(null);
+    if (t == null) {
+      return ResponseEntity.notFound().build();
+    }
+    t.clearBodyFont();
+    return ResponseEntity.ok(Dto.from(repo.save(t)));
   }
 }

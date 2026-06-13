@@ -16,7 +16,7 @@
 	}
 }
 html {
-	font-family: 'IBM Plex Sans', sans-serif;
+	font-family: $FONTFAMILY;
 	font-size: $FONTPTpt;
 	color: #1c2127;
 	line-height: 1.5;
@@ -44,6 +44,16 @@ h2 {
 	padding-bottom: 3px;
 }
 h3 { font-size: $H3PTpt; font-weight: 600; margin: 10px 0 4px; }
+/* Disclaimer / cover heading: uppercase, slightly larger than body text, normal weight, and
+   tighter line spacing than a paragraph. Sized relative to the surrounding text. */
+h5 {
+	margin: 0 0 6px;
+	font-size: 1.15em;
+	font-weight: normal;
+	text-transform: uppercase;
+	line-height: 1.25;
+	color: #3d4752;
+}
 p { margin: 0 0 7px; }
 ul, ol { margin: 0 0 7px; padding-left: 18px; }
 li { margin: 0 0 2px; }
@@ -53,14 +63,14 @@ code {
 	background: #f1f3f5;
 	padding: 0 3px;
 	border-radius: 3px;
-	font-size: 9pt;
+	font-size: 8pt;
 }
 pre {
 	font-family: 'IBM Plex Mono', monospace;
 	background: #f6f7f9;
 	padding: 8px;
 	border-radius: 4px;
-	font-size: 9pt;
+	font-size: 8pt;
 	white-space: pre-wrap;
 }
 /* Syntax-highlighted fenced code block: a language label above the source. */
@@ -200,4 +210,38 @@ table.hist th {
 	font-family: 'IBM Plex Mono', monospace;
 	font-size: 7.5pt;
 	color: $ACCENT;
+}
+
+/* Back cover page (last page). The cell spans nearly the full printable A4 height
+   (297mm − 24mm top − 22mm bottom margins = 251mm) so vertical-align places the logo
+   and text at the chosen edge. The height is held a couple of mm under the exact page
+   box and table spacing is zeroed so sub-point rounding can't spill it onto a second
+   page. Restyle any of these in custom CSS. */
+.cover {
+	page-break-before: always;
+	page-break-inside: avoid;
+	display: table;
+	table-layout: fixed;
+	border-collapse: collapse;
+	border-spacing: 0;
+	width: 100%;
+	height: 248mm;
+}
+.cover-cell {
+	display: table-cell;
+	vertical-align: $COVERVALIGN;
+	text-align: center;
+	padding: 0;
+}
+.cover-logo { max-height: 72px; margin-bottom: 18px; }
+/* Cover logo size keywords, driven by the template's logo-size setting (the logo variable
+   emits "cover-logo cover-logo-{size}"). Override max-height in custom CSS for finer control. */
+.cover-logo-small  { max-height: 40px; }
+.cover-logo-medium { max-height: 72px; }
+.cover-logo-large  { max-height: 120px; }
+.cover-logo-xlarge { max-height: 180px; }
+/* The disclaimer block is an h5 element (see the h5 rule for size/weight/leading); this is just a
+   colour + alignment hook you can override in custom CSS. */
+.cover-text {
+	color: #3d4752;
 }

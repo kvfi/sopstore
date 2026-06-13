@@ -55,4 +55,50 @@ class PdfExporterCustomTemplateTest {
     String text = text(export(t));
     assertThat(text).contains("MyTitle").contains("Purpose").doesNotContain("UNIQUEHEADER");
   }
+
+  @Test
+  void coverPageIsAppendedAsTheLastPage() throws IOException {
+    DocTemplate t = new DocTemplate(UUID.randomUUID(), UUID.randomUUID(), "T", "#123456", null);
+    t.setCoverEnabled(true);
+    t.setCoverAlign("bottom");
+    t.setCoverText("COVERMARKER line one");
+    byte[] pdf = export(t);
+    try (PDDocument doc = PDDocument.load(pdf)) {
+      // The short sample body is one page, so body + cover must be exactly two pages: a cover that
+      // spilled over its page would make this three. Guards against the full-page-height rounding.
+      assertThat(doc.getNumberOfPages()).isEqualTo(2);
+      PDFTextStripper last = new PDFTextStripper();
+      last.setStartPage(doc.getNumberOfPages());
+      last.setEndPage(doc.getNumberOfPages());
+      assertThat(last.getText(doc)).contains("COVERMARKER");
+    }
+  }
+
+  @Test
+  void coverPageOmittedWhenDisabled() throws IOException {
+    DocTemplate t = new DocTemplate(UUID.randomUUID(), UUID.randomUUID(), "T", "#123456", null);
+    t.setCoverText("COVERMARKER");
+    assertThat(text(export(t))).doesNotContain("COVERMARKER");
+  }
+
+  @Test
+  void customCoverTemplateDrivesTheCoverPage() throws IOException {
+    DocTemplate t = new DocTemplate(UUID.randomUUID(), UUID.randomUUID(), "T", "#123456", null);
+    t.setCoverEnabled(true);
+    t.setCoverText("ignored when custom html is set");
+    t.setCoverHtml("<div class=\"cover\"><div class=\"cover-cell\">CUSTOMCOVER {{title}}</div></div>");
+    String text = text(export(t));
+    assertThat(text).contains("CUSTOMCOVER").contains("MyTitle");
+  }
+
+  @Test
+  void brokenCoverTemplateFallsBackToBuiltInCover() throws IOException {
+    DocTemplate t = new DocTemplate(UUID.randomUUID(), UUID.randomUUID(), "T", "#123456", null);
+    t.setCoverEnabled(true);
+    t.setCoverText("FALLBACKMARKER");
+    // An unclosed Mustache section fails to compile — the export must not throw.
+    t.setCoverHtml("<div class=\"cover\">{{#hasLogo}} never closed");
+    String text = text(export(t));
+    assertThat(text).contains("FALLBACKMARKER").doesNotContain("CUSTOMCOVER");
+  }
 }

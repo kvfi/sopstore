@@ -27,6 +27,14 @@ export type ExportTemplate = {
 	hasLogo: boolean;
 	customCss: string;
 	customHtml: string;
+	fontFamily: string;
+	hasBodyFont: boolean;
+	bodyFontName: string | null;
+	coverEnabled: boolean;
+	coverText: string;
+	coverAlign: string;
+	coverHtml: string;
+	coverLogoSize: string;
 };
 
 export type ScriptBundleSettings = {
@@ -482,6 +490,12 @@ type TemplateInput = {
 	tableFontPt: number;
 	customCss?: string;
 	customHtml?: string;
+	fontFamily?: string;
+	coverEnabled?: boolean;
+	coverText?: string;
+	coverAlign?: string;
+	coverHtml?: string;
+	coverLogoSize?: string;
 };
 
 export function useCreateTemplate() {
@@ -504,7 +518,13 @@ export function useUpdateTemplate() {
 				headingFontPt: v.headingFontPt,
 				tableFontPt: v.tableFontPt,
 				customCss: v.customCss,
-				customHtml: v.customHtml
+				customHtml: v.customHtml,
+				fontFamily: v.fontFamily,
+				coverEnabled: v.coverEnabled,
+				coverText: v.coverText,
+				coverAlign: v.coverAlign,
+				coverHtml: v.coverHtml,
+				coverLogoSize: v.coverLogoSize
 			}),
 		onSuccess: () => qc.invalidateQueries({ queryKey: qk.exportTemplates })
 	});
@@ -523,6 +543,23 @@ export function useUploadTemplateLogo() {
 	return useMutation({
 		mutationFn: (v: { id: string; file: File }) =>
 			upload<ExportTemplate>(`/api/v1/export-templates/${v.id}/logo`, v.file),
+		onSuccess: () => qc.invalidateQueries({ queryKey: qk.exportTemplates })
+	});
+}
+
+export function useUploadTemplateFont() {
+	const qc = useQueryClient();
+	return useMutation({
+		mutationFn: (v: { id: string; file: File }) =>
+			upload<ExportTemplate>(`/api/v1/export-templates/${v.id}/font`, v.file),
+		onSuccess: () => qc.invalidateQueries({ queryKey: qk.exportTemplates })
+	});
+}
+
+export function useClearTemplateFont() {
+	const qc = useQueryClient();
+	return useMutation({
+		mutationFn: (id: string) => api.del(`/api/v1/export-templates/${id}/font`),
 		onSuccess: () => qc.invalidateQueries({ queryKey: qk.exportTemplates })
 	});
 }
