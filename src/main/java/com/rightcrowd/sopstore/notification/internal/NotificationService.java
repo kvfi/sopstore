@@ -133,7 +133,7 @@ public class NotificationService implements NotificationPort {
   }
 
   /** Renders a notification from its template key and model. Tenant template overrides are TODO. */
-  private static Rendered render(String key, Map<String, Object> model) {
+  static Rendered render(String key, Map<String, Object> model) {
     String title = str(model, "title");
     String stage = str(model, "stage");
     String procLink =
@@ -143,12 +143,12 @@ public class NotificationService implements NotificationPort {
           new Rendered(
               "Approval needed: " + title,
               "You have an approval task at stage \"" + stage + "\".",
-              "/lifecycle/tasks");
+              procLink);
       case "workflow.task.overdue" ->
           new Rendered(
               "Overdue approval: " + title,
               "An approval task at stage \"" + stage + "\" is past its due date.",
-              "/lifecycle/tasks");
+              procLink);
       case "workflow.completed" ->
           new Rendered(
               "Approved: " + title,
@@ -169,5 +169,5 @@ public class NotificationService implements NotificationPort {
   }
 
   /** A rendered notification ready to dispatch over any channel. */
-  private record Rendered(String title, String body, @Nullable String link) {}
+  record Rendered(String title, String body, @Nullable String link) {}
 }

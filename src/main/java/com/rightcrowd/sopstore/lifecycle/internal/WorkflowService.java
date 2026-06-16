@@ -136,7 +136,7 @@ public class WorkflowService {
    * @throws SecurityException if the actor lacks the task's role, the task is already decided, or
    *     re-authentication fails
    */
-  public void decide(
+  public DecideResult decide(
       UUID taskId,
       boolean approve,
       @Nullable String password,
@@ -151,6 +151,7 @@ public class WorkflowService {
     }
     WorkflowInstance instance = instances.findById(task.instanceId()).orElseThrow();
     ChangeRequest cr = changeRequests.findById(task.changeRequestId()).orElseThrow();
+    int totalStages = stagesOf(instance).size();
 
     if (!approve) {
       String why = (reason == null || reason.isBlank()) ? "rejected at review" : reason;
@@ -169,7 +170,7 @@ public class WorkflowService {
               "workflow.task.rejected",
               actor,
               "{\"stage\":\"" + task.stageName() + "\",\"reason\":" + jsonString(why) + "}"));
-      return;
+      return new DecideResult("REJECTED", totalStages, 0, null);
     }
 
     // Approve: fresh-credential challenge -> single-use token -> bound e-signature.
@@ -209,13 +210,26 @@ public class WorkflowService {
     boolean stageComplete =
         tasks.findByInstanceIdAndStageIndex(instance.id(), task.stageIndex()).stream()
             .allMatch(t -> t.status() == WorkflowTask.Status.APPROVED);
-    if (stageComplete) {
-      openNextStage(instance, cr, actor);
+    if (!stageComplete) {
+      // Signed, but other approvers in this same stage are still pending.
+      return new DecideResult("RECORDED", totalStages, task.stageIndex() + 1, task.stageName());
     }
+    OpenOutcome o = openNextStage(instance, cr, actor);
+    return o.complete()
+        ? new DecideResult("COMPLETE", totalStages, 0, null)
+        : new DecideResult("ADVANCED", totalStages, o.nextStageNumber(), o.nextStageName());
   }
 
+  /** What a decision did, so the UI can message it accurately. */
+  public record DecideResult(
+      String outcome, int totalStages, int nextStageNumber, @Nullable String nextStageName) {}
+
+  /** Result of opening the next stage: whether the workflow completed, else the new stage. */
+  private record OpenOutcome(
+      boolean complete, int nextStageNumber, @Nullable String nextStageName) {}
+
   /** Advances to the next applicable stage, or completes the workflow if none remain. */
-  private void openNextStage(WorkflowInstance instance, ChangeRequest cr, UUID actor) {
+  private OpenOutcome openNextStage(WorkflowInstance instance, ChangeRequest cr, UUID actor) {
     List<WorkflowStage> stages = stagesOf(instance);
     int next = instance.currentStage() + 1;
     while (next < stages.size() && !stages.get(next).condition().appliesTo(cr)) {
@@ -235,11 +249,18 @@ public class WorkflowService {
               "workflow.completed",
               actor,
               "{\"procedureId\":\"" + instance.procedureId() + "\"}"));
-      return;
+      return new OpenOutcome(true, 0, null);
     }
     instance.moveToStage(next);
     instances.save(instance);
     openStageTasks(instance, cr, next, stages.get(next));
+    return new OpenOutcome(false, next + 1, stages.get(next).name());
+  }
+
+  /** The number of stages in the workflow backing the given instance (0 if missing). */
+  @Transactional(readOnly = true)
+  public int totalStages(UUID instanceId) {
+    return instances.findById(instanceId).map(this::stagesOf).map(List::size).orElse(0);
   }
 
   private void openStageTasks(

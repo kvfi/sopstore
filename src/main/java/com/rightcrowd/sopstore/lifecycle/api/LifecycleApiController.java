@@ -51,7 +51,9 @@ public class LifecycleApiController {
       String role,
       String meaning,
       String status,
-      @Nullable String due) {}
+      @Nullable String due,
+      int stageNumber,
+      int totalStages) {}
 
   /** Change requests + tasks for one procedure. */
   public record ChangeControl(List<ChangeRequestDto> changeRequests, List<TaskDto> tasks) {}
@@ -94,12 +96,12 @@ public class LifecycleApiController {
 
   /** Records an approval decision. Approving signs a Part 11 e-signature (fresh password). */
   @PostMapping("/api/v1/approvals/{taskId}/decide")
-  public void decide(
+  public WorkflowService.DecideResult decide(
       @PathVariable UUID taskId,
       @RequestBody Decision decision,
       @AuthenticationPrincipal AuthenticatedUser user) {
     try {
-      workflow.decide(
+      return workflow.decide(
           taskId, decision.approve(), decision.password(), decision.reason(), user.user().id());
     } catch (SecurityException e) {
       throw new ResponseStatusException(HttpStatus.FORBIDDEN, e.getMessage());
@@ -130,6 +132,8 @@ public class LifecycleApiController {
         t.assigneeRole().name(),
         t.meaning().name(),
         t.status().name(),
-        due == null ? null : due.toString());
+        due == null ? null : due.toString(),
+        t.stageIndex() + 1,
+        workflow.totalStages(t.instanceId()));
   }
 }

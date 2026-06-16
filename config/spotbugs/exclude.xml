@@ -41,4 +41,16 @@
         <Class name="~com\.rightcrowd\.sopstore\.(reporting\.DashboardApiController|lifecycle\.api\.LifecycleApiController|execution\.api\.RunsApiController|notification\.api\.NotificationsApiController|procedure\.api\.ProcedureApiController|procedure\.api\.AttachmentApiController|procedure\.internal\.AttachmentService|identity\.api\.MeController|identity\.api\.ProfileController|scripts\.api\.ScriptProxyController)(\$.*)?"/>
         <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
     </Match>
+
+    <!--
+      dataops export/import: Spring constructor injection stores the JdbcTemplate / ObjectMapper /
+      AuditPort beans by reference by design; defensive-copying an injected bean is incorrect.
+    -->
+    <Match>
+        <Or>
+            <Class name="com.rightcrowd.sopstore.dataops.internal.TenantDataService"/>
+            <Class name="com.rightcrowd.sopstore.dataops.api.TenantDataController"/>
+        </Or>
+        <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
+    </Match>
 </FindBugsFilter>

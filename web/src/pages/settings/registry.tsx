@@ -7,6 +7,7 @@ import ProcedureFormSettings from './ProcedureForm';
 import ExportTemplates from './ExportTemplates';
 import ScriptBundleSettingsPage from './ScriptBundleSettings';
 import SessionPolicy from './SessionPolicy';
+import DataBackup from './DataBackup';
 
 export type SettingsSection = {
 	/** Path segment under /settings (also the hub link target). */
@@ -71,5 +72,12 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
 		icon: 'time',
 		desc: 'How long signed-in sessions last before idle and absolute timeouts sign users out.',
 		element: <SessionPolicy />
+	},
+	{
+		path: 'data',
+		label: 'Backup & restore',
+		icon: 'database',
+		desc: 'Export this tenant’s data as a JSON bundle, or restore it from a previous export.',
+		element: <DataBackup />
 	}
 ];

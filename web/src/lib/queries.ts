@@ -132,6 +132,15 @@ export type ApprovalTask = {
 	meaning: string;
 	status: string;
 	due: string | null;
+	stageNumber: number;
+	totalStages: number;
+};
+
+export type DecideResult = {
+	outcome: 'COMPLETE' | 'ADVANCED' | 'RECORDED' | 'REJECTED';
+	totalStages: number;
+	nextStageNumber: number;
+	nextStageName: string | null;
 };
 
 export type RunRow = {
@@ -257,6 +266,18 @@ export function useSaveSessionPolicy() {
 	return useMutation({
 		mutationFn: (v: SessionPolicy) => api.put<SessionPolicy>('/api/v1/session-policy', v),
 		onSuccess: () => qc.invalidateQueries({ queryKey: qk.sessionPolicy })
+	});
+}
+
+// ---- tenant data export/import (admin) ----
+export type ImportResult = { tables: number; rows: number };
+
+export function useImportTenantData() {
+	const qc = useQueryClient();
+	return useMutation({
+		mutationFn: (file: File) => upload<ImportResult>('/api/v1/tenant-data/import', file),
+		// Import replaces tenant data wholesale — refetch everything.
+		onSuccess: () => qc.invalidateQueries()
 	});
 }
 
@@ -427,7 +448,7 @@ export function useDecideApproval() {
 	const qc = useQueryClient();
 	return useMutation({
 		mutationFn: (v: { taskId: string; approve: boolean; password: string | null; reason: string | null }) =>
-			api.post(`/api/v1/approvals/${v.taskId}/decide`, {
+			api.post<DecideResult>(`/api/v1/approvals/${v.taskId}/decide`, {
 				approve: v.approve,
 				password: v.password,
 				reason: v.reason

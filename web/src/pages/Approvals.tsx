@@ -51,13 +51,24 @@ export default function Approvals() {
 		if (!active) return;
 		setBusy(true);
 		try {
-			await decide.mutateAsync({
+			const res = await decide.mutateAsync({
 				taskId: active.id,
 				approve: mode === 'approve',
 				password: mode === 'approve' ? password : null,
 				reason: mode === 'reject' ? reason : null
 			});
-			toast(mode === 'approve' ? 'Approved & signed' : 'Change request rejected', 'success');
+			if (mode === 'reject') {
+				toast('Change request rejected', 'success');
+			} else if (res.outcome === 'COMPLETE') {
+				toast('Procedure fully approved & signed ✓', 'success');
+			} else if (res.outcome === 'ADVANCED') {
+				toast(
+					`Signed — now awaiting ${res.nextStageName} (stage ${res.nextStageNumber} of ${res.totalStages})`,
+					'success'
+				);
+			} else {
+				toast('Signed — awaiting the other approvers in this stage', 'success');
+			}
 			setOpen(false);
 		} catch (err) {
 			const msg = (err as Error).message || 'Decision failed';
@@ -116,7 +127,14 @@ export default function Approvals() {
 								<td>
 									<Link to={`/procedures/${t.procedureId}`}>{t.procedureTitle}</Link>
 								</td>
-								<td>{t.stage}</td>
+								<td>
+									{t.stage}
+									{t.totalStages > 1 && (
+										<span className="mono muted" style={{ fontSize: 11, marginLeft: 6 }}>
+											stage {t.stageNumber} of {t.totalStages}
+										</span>
+									)}
+								</td>
 								<td>
 									<Tag intent="primary" minimal>
 										{t.meaning}
