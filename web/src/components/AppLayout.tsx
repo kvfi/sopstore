@@ -16,6 +16,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { logout } from '../lib/api';
 import { useMe, useNotifications, useApprovals } from '../lib/queries';
 import { useCollapsedGroups } from '../lib/useCollapsedGroups';
+import { SETTINGS_SECTIONS } from '../pages/settings/registry';
 
 type NavEntry = {
 	href: string;
@@ -23,8 +24,10 @@ type NavEntry = {
 	icon: IconName;
 	title: string;
 	badge?: boolean;
+	/** Match only the exact path (e.g. the settings overview, not its sub-pages). */
+	exact?: boolean;
 };
-type NavGroup = { title: string; admin?: boolean; entries: NavEntry[] };
+type NavGroup = { title: string; admin?: boolean; defaultCollapsed?: boolean; entries: NavEntry[] };
 
 const NAV_GROUPS: NavGroup[] = [
 	{
@@ -44,9 +47,18 @@ const NAV_GROUPS: NavGroup[] = [
 		]
 	},
 	{
-		title: 'Admin',
+		title: 'Settings',
 		admin: true,
-		entries: [{ href: '/settings', label: 'Settings', icon: 'cog', title: 'Settings' }]
+		defaultCollapsed: true,
+		entries: [
+			{ href: '/settings', label: 'Overview', icon: 'cog', title: 'Settings', exact: true },
+			...SETTINGS_SECTIONS.map((s): NavEntry => ({
+				href: `/settings/${s.path}`,
+				label: s.label,
+				icon: s.icon,
+				title: s.label
+			}))
+		]
 	}
 ];
 
@@ -69,7 +81,7 @@ export default function AppLayout() {
 	const meQ = useMe();
 	const unread = useNotifications().data?.unread ?? 0;
 	const approvals = useApprovals().data?.length ?? 0;
-	const { isOpen, toggle } = useCollapsedGroups('sidebarNavCollapsed');
+	const { isOpen, toggle } = useCollapsedGroups('sidebarNavOpen');
 
 	useEffect(() => {
 		if (meQ.isError) navigate('/signin', { replace: true });
@@ -91,8 +103,9 @@ export default function AppLayout() {
 	}
 
 	const path = location.pathname;
-	const isActive = (href: string) => (href === '/' ? path === '/' : path.startsWith(href));
-	const current = ALL_ENTRIES.find((n) => isActive(n.href));
+	const isActive = (n: NavEntry) =>
+		n.exact || n.href === '/' ? path === n.href : path.startsWith(n.href);
+	const current = ALL_ENTRIES.find(isActive);
 	const title = current?.title ?? (path.startsWith('/procedures/') ? 'Procedure' : 'sopstore');
 	const isAdmin = me.roles.includes('TENANT_ADMIN') || me.roles.includes('SUPER_ADMIN');
 	const visibleGroups = NAV_GROUPS.filter((g) => !g.admin || isAdmin);
@@ -112,26 +125,26 @@ export default function AppLayout() {
 
 				<nav>
 					{visibleGroups.map((g) => {
-						const open = isOpen(g.title);
+						const open = isOpen(g.title, !g.defaultCollapsed);
 						return (
 							<div key={g.title} className="nav-group">
 								<button
 									type="button"
 									className="nav-group-h"
 									aria-expanded={open}
-									onClick={() => toggle(g.title)}
+									onClick={() => toggle(g.title, !g.defaultCollapsed)}
 								>
-									<Icon icon={open ? 'chevron-down' : 'chevron-right'} size={14} />
+									<Icon icon={open ? 'chevron-down' : 'chevron-right'} size={12} />
 									<span>{g.title}</span>
 								</button>
 								<Collapse isOpen={open} keepChildrenMounted>
-									<Menu large>
+									<Menu>
 										{g.entries.map((item) => (
 											<MenuItem
 												key={item.href}
 												icon={item.icon}
 												text={item.label}
-												active={isActive(item.href)}
+												active={isActive(item)}
 												onClick={() => navigate(item.href)}
 												labelElement={
 													item.badge && approvals > 0 ? (

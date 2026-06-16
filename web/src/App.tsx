@@ -8,13 +8,12 @@ import Approvals from './pages/Approvals';
 import Notifications from './pages/Notifications';
 import Runs from './pages/Runs';
 import Scripts from './pages/Scripts';
+import ScriptDetail from './pages/ScriptDetail';
 import Profile from './pages/Profile';
 import SettingsLayout from './pages/SettingsLayout';
-import PrerequisiteTypes from './pages/settings/PrerequisiteTypes';
-import Prerequisites from './pages/settings/Prerequisites';
-import ExportTemplates from './pages/settings/ExportTemplates';
-import ConfidentialityLevels from './pages/settings/ConfidentialityLevels';
-import ScriptBundleSettingsPage from './pages/settings/ScriptBundleSettings';
+import SettingsHome from './pages/SettingsHome';
+import SettingsPage from './components/SettingsPage';
+import { SETTINGS_SECTIONS } from './pages/settings/registry';
 
 export default function App() {
 	return (
@@ -29,14 +28,18 @@ export default function App() {
 					<Route path="/notifications" element={<Notifications />} />
 					<Route path="/runs" element={<Runs />} />
 					<Route path="/scripts" element={<Scripts />} />
+					<Route path="/scripts/new" element={<ScriptDetail />} />
+					<Route path="/scripts/:id" element={<ScriptDetail />} />
 					<Route path="/profile" element={<Profile />} />
 					<Route path="/settings" element={<SettingsLayout />}>
-						<Route index element={<Navigate to="configuration/prerequisite-types" replace />} />
-						<Route path="configuration/prerequisite-types" element={<PrerequisiteTypes />} />
-						<Route path="configuration/prerequisites" element={<Prerequisites />} />
-						<Route path="configuration/export-templates" element={<ExportTemplates />} />
-						<Route path="configuration/script-bundles" element={<ScriptBundleSettingsPage />} />
-						<Route path="configuration/confidentiality-levels" element={<ConfidentialityLevels />} />
+						<Route index element={<SettingsHome />} />
+						{SETTINGS_SECTIONS.map((s) => (
+							<Route
+								key={s.path}
+								path={s.path}
+								element={<SettingsPage title={s.label}>{s.element}</SettingsPage>}
+							/>
+						))}
 					</Route>
 				</Route>
 				<Route path="*" element={<Navigate to="/" replace />} />

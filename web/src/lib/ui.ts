@@ -23,6 +23,29 @@ export function statusIntent(status: string): Intent {
 	}
 }
 
+/** Maps a domain status to a chart-series CSS color, consistent with statusIntent. */
+export function statusColor(status: string): string {
+	switch (statusIntent(status)) {
+		case Intent.SUCCESS:
+			return 'var(--success)';
+		case Intent.PRIMARY:
+			return 'var(--chart-1)';
+		case Intent.WARNING:
+			return 'var(--warning)';
+		case Intent.DANGER:
+			return 'var(--danger)';
+		default:
+			return 'var(--slate-400)';
+	}
+}
+
+/** Tallies occurrences of each string, preserving first-seen order. */
+export function tally(items: string[]): { name: string; value: number }[] {
+	const counts = new Map<string, number>();
+	for (const it of items) counts.set(it, (counts.get(it) ?? 0) + 1);
+	return [...counts.entries()].map(([name, value]) => ({ name, value }));
+}
+
 /** Trims an ISO timestamp to "YYYY-MM-DD HH:MM". */
 export function dt(iso: string | null | undefined): string {
 	return iso ? iso.slice(0, 16).replace('T', ' ') : '—';

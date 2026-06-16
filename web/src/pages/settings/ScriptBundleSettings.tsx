@@ -111,7 +111,7 @@ export default function ScriptBundleSettingsPage() {
 				its default.
 			</p>
 
-			<Card style={{ maxWidth: 620 }}>
+			<Card>
 				<FormGroup
 					label="Bundle folder"
 					helperText="Folder the script files are placed in inside the ZIP."

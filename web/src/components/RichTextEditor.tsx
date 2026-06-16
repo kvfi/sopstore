@@ -4,6 +4,7 @@ import type { AnyExtension } from '@tiptap/core';
 import StarterKit from '@tiptap/starter-kit';
 import { Button, ButtonGroup, Menu, MenuItem, Popover, Position } from '@blueprintjs/core';
 import { AttachmentRef } from './attachment-ref-node';
+import { Callout } from './callout-node';
 
 /** A procedure attachment exposed to the editor as an insertable reference. */
 export type RefItem = { refId: string; filename: string };
@@ -66,7 +67,7 @@ const RichTextEditor = forwardRef<RichTextHandle, Props>(function RichTextEditor
 
 	const editor = useEditor({
 		editable: !disabled,
-		extensions: [StarterKit, AttachmentRef, ...(extraExtensions ?? [])],
+		extensions: [StarterKit, AttachmentRef, Callout, ...(extraExtensions ?? [])],
 		content: value ?? '',
 		onUpdate: ({ editor }) => onChange(editor.getJSON()),
 		editorProps: {
@@ -127,6 +128,13 @@ const RichTextEditor = forwardRef<RichTextHandle, Props>(function RichTextEditor
 	const codeLanguage = (editor.getAttributes('codeBlock').language as string | null) ?? null;
 	const codeLanguageLabel = CODE_LANGUAGES.find((l) => l.value === codeLanguage)?.label ?? 'Plain text';
 
+	// Wrap the current block in a callout of the given type (or retype an existing one).
+	const setNote = (noteType: 'info' | 'warning' | 'critical') => {
+		if (editor.isActive('callout')) editor.chain().focus().updateAttributes('callout', { noteType }).run();
+		else editor.chain().focus().wrapIn('callout', { noteType }).run();
+	};
+	const removeNote = () => editor.chain().focus().lift('callout').run();
+
 	return (
 		<div className={`rte ${disabled ? 'rte-disabled' : ''}`}>
 			{!disabled && (
@@ -139,6 +147,24 @@ const RichTextEditor = forwardRef<RichTextHandle, Props>(function RichTextEditor
 						<Button small icon="numbered-list" active={editor.isActive('orderedList')} onClick={() => editor.chain().focus().toggleOrderedList().run()} aria-label="Numbered list" />
 						<Button small icon="link" active={editor.isActive('link')} onClick={setLink} aria-label="Link" />
 						<Button small icon="code" active={editor.isActive('codeBlock')} onClick={() => editor.chain().focus().toggleCodeBlock().run()} aria-label="Code block" />
+							<Popover
+								position={Position.BOTTOM_LEFT}
+								content={
+									<Menu>
+										<MenuItem icon="info-sign" text="Info" onClick={() => setNote('info')} />
+										<MenuItem icon="warning-sign" text="Warning" onClick={() => setNote('warning')} />
+										<MenuItem icon="error" text="Critical" onClick={() => setNote('critical')} />
+										<MenuItem
+											icon="cross"
+											text="Remove note"
+											disabled={!editor.isActive('callout')}
+											onClick={removeNote}
+										/>
+									</Menu>
+								}
+							>
+								<Button small icon="annotation" rightIcon="caret-down" active={editor.isActive('callout')} aria-label="Note" />
+							</Popover>
 					</ButtonGroup>
 					{editor.isActive('codeBlock') && (
 						<Popover

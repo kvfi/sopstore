@@ -209,6 +209,21 @@ public class ProcedureApiController {
     }
   }
 
+  /** A new human-readable title for a procedure. */
+  public record TitleDto(String title) {}
+
+  /** Renames the procedure's title. The title is trimmed and must be non-blank (max 200 chars). */
+  @PutMapping("/{id}/title")
+  public ResponseEntity<ProcedureDto> setTitle(
+      @PathVariable UUID id, @RequestBody TitleDto req) {
+    try {
+      Procedure p = service.rename(id, req.title());
+      return ResponseEntity.ok(ProcedureDto.from(p));
+    } catch (IllegalArgumentException e) {
+      return ResponseEntity.badRequest().build();
+    }
+  }
+
   /** A confidentiality classification for a document (null clears it). */
   public record ConfidentialityDto(@Nullable UUID levelId) {}
 

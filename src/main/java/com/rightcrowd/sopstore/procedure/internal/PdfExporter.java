@@ -41,7 +41,7 @@ final class PdfExporter {
   private static final String SANS = "IBM Plex Sans";
   private static final String MONO = "IBM Plex Mono";
   private static final DateTimeFormatter DATE =
-      DateTimeFormatter.ofPattern("yyyy-MM-dd").withZone(ZoneOffset.UTC);
+      DateTimeFormatter.ofPattern("dd/MM/yyyy").withZone(ZoneOffset.UTC);
 
   private PdfExporter() {}
 
@@ -127,9 +127,8 @@ final class PdfExporter {
   }
 
   // ----------------------------------------------------------------- document assembly
-  private static final String[] SECTIONS = {
-    "Purpose", "Scope", "Prerequisites", "Steps", "Document history"
-  };
+  /** One rendered document section: a heading title and its body HTML. */
+  private record Section(String title, String html) {}
 
   private static String buildXhtml(
       Procedure p,
@@ -163,7 +162,7 @@ final class PdfExporter {
     sb.append("<div class=\"meta\">")
         .append(esc(p.documentNumber()))
         .append(" &#183; v")
-        .append(esc(version == null ? "—" : version.versionLabel()))
+        .append(esc(version == null ? "-" : version.versionLabel()))
         .append(" &#183; ")
         .append(esc(p.state()));
     if (confidentiality != null && !confidentiality.isBlank()) {
@@ -174,20 +173,11 @@ final class PdfExporter {
     sb.append("</div>");
     sb.append("<h1>").append(esc(p.title())).append("</h1>");
 
-    // Table of contents (page numbers filled by target-counter at render time).
-    sb.append("<div class=\"toc\"><div class=\"toc-h\">Contents</div>");
-    for (int i = 0; i < SECTIONS.length; i++) {
-      sb.append("<div class=\"toc-row\"><a href=\"#sec-")
-          .append(i + 1)
-          .append("\">")
-          .append(i + 1)
-          .append(". ")
-          .append(esc(SECTIONS[i]))
-          .append("</a></div>");
-    }
-    sb.append("</div>");
-
-    sb.append(defaultBody(body, version, history, authorNames, bundleConfig));
+    // Table of contents + bodies, both driven by the same ordered section list (page numbers are
+    // filled by target-counter at render time).
+    List<Section> secs = sections(body, version, history, authorNames, bundleConfig);
+    sb.append(renderToc(secs));
+    sb.append(renderBodies(secs));
     sb.append(coverPage(p, version, template, accent, confidentiality));
 
     sb.append("</body></html>");
@@ -242,7 +232,7 @@ final class PdfExporter {
     Map<String, Object> m = new HashMap<>();
     m.put("title", p.title());
     m.put("documentNumber", p.documentNumber());
-    m.put("version", version == null ? "—" : version.versionLabel());
+    m.put("version", version == null ? "-" : version.versionLabel());
     m.put("state", p.state());
     m.put(
         "confidentiality",
@@ -287,24 +277,123 @@ final class PdfExporter {
       List<ProcedureVersion> history,
       Map<UUID, String> authorNames,
       ScriptBundleConfig bundleConfig) {
-    StringBuilder sb = new StringBuilder(2048);
-    sb.append(h2str(1)).append(textBlock(body.path("purpose").asText("")));
-    sb.append(h2str(2)).append(textBlock(body.path("scope").asText("")));
-    sb.append(h2str(3)).append(prerequisites(body.path("prerequisites")));
+    return renderBodies(sections(body, version, history, authorNames, bundleConfig));
+  }
 
-    sb.append(h2str(4));
+  /** The ordered document sections: the built-ins, any custom sections, then Document history. */
+  private static List<Section> sections(
+      JsonNode body,
+      @Nullable ProcedureVersion version,
+      List<ProcedureVersion> history,
+      Map<UUID, String> authorNames,
+      ScriptBundleConfig bundleConfig) {
+    List<Section> secs = new ArrayList<>();
+    secs.add(new Section("Purpose", richOrText(body.path("purpose"))));
+    secs.add(new Section("Scope", richOrText(body.path("scope"))));
+    secs.add(new Section("Prerequisites", prerequisites(body.path("prerequisites"))));
+    secs.add(new Section("Steps", stepsHtml(body, bundleConfig)));
+    // Custom form: each element is its own top-level, sequentially-numbered section (label heading
+    // + its value). New procedures store a flat `customFields`; older ones nested fields under
+    // `customSections` — flatten both so any saved version still renders.
+    for (JsonNode f : body.path("customFields")) {
+      addCustomField(secs, f);
+    }
+    for (JsonNode cs : body.path("customSections")) {
+      for (JsonNode f : cs.path("fields")) {
+        addCustomField(secs, f);
+      }
+    }
+    secs.add(new Section("Document history", historyTable(history, version, authorNames)));
+    return secs;
+  }
+
+  /** Appends one custom-form field as a top-level section (label heading + type-aware value). */
+  private static void addCustomField(List<Section> secs, JsonNode f) {
+    String label = f.path("label").asText("");
+    if (label.isBlank()) {
+      return;
+    }
+    secs.add(new Section(label, customFieldHtml(f.path("type").asText("TEXT"), f.path("value"))));
+  }
+
+  /** Renders a rich-text field (TipTap JSON) or a legacy plain-text value, with a fallback. */
+  private static String richOrText(JsonNode node) {
+    if (node.isObject()) {
+      String h = html(node);
+      return h.isBlank() ? "<p class=\"muted\">Not specified.</p>" : h;
+    }
+    return textBlock(node.asText(""));
+  }
+
+  /** Maps a callout note type to its CSS modifier class (defaulting to info). */
+  private static String noteClass(String type) {
+    return switch (type) {
+      case "warning" -> "warning";
+      case "critical" -> "critical";
+      default -> "info";
+    };
+  }
+
+  /** Renders the steps list, or a placeholder when none are authored. */
+  private static String stepsHtml(JsonNode body, ScriptBundleConfig bundleConfig) {
     JsonNode steps = body.path("steps");
     if (steps.isArray() && !steps.isEmpty()) {
+      StringBuilder sb = new StringBuilder();
       int n = 1;
       for (JsonNode s : steps) {
         sb.append(step(s, n++, bundleConfig));
       }
-    } else {
-      sb.append("<p class=\"muted\">No steps authored yet.</p>");
+      return sb.toString();
     }
+    return "<p class=\"muted\">No steps authored yet.</p>";
+  }
 
-    sb.append(h2str(5)).append(historyTable(history, version, authorNames));
+  /** The table of contents, numbered to match the section bodies. */
+  private static String renderToc(List<Section> secs) {
+    StringBuilder sb = new StringBuilder();
+    sb.append("<div class=\"toc\"><div class=\"toc-h\">Contents</div>");
+    int n = 1;
+    for (Section s : secs) {
+      sb.append("<div class=\"toc-row\"><a href=\"#sec-")
+          .append(n)
+          .append("\">")
+          .append(n)
+          .append(". ")
+          .append(esc(s.title()))
+          .append("</a></div>");
+      n++;
+    }
+    return sb.append("</div>").toString();
+  }
+
+  /** Renders each section as a numbered, anchored {@code <h2>} heading followed by its body. */
+  private static String renderBodies(List<Section> secs) {
+    StringBuilder sb = new StringBuilder(2048);
+    int n = 1;
+    for (Section s : secs) {
+      sb.append("<h2 id=\"sec-")
+          .append(n)
+          .append("\">")
+          .append(n)
+          .append(". ")
+          .append(esc(s.title()))
+          .append("</h2>")
+          .append(s.html());
+      n++;
+    }
     return sb.toString();
+  }
+
+  /** Renders one custom field's value according to its type (rich text, checkbox, or plain). */
+  private static String customFieldHtml(String type, JsonNode value) {
+    return switch (type) {
+      case "RICHTEXT" -> {
+        String h = html(value);
+        yield h.isBlank() ? "<p class=\"muted\">Not specified.</p>" : h;
+      }
+      case "CHECKBOX" -> "<p>" + (value.asBoolean(false) ? "Yes" : "No") + "</p>";
+      default -> textBlock(value.isValueNode() ? value.asText("") : "");
+    };
   }
 
   /** Builds the Mustache context a custom PDF template renders against. */
@@ -321,7 +410,7 @@ final class PdfExporter {
     Map<String, Object> m = new HashMap<>();
     m.put("title", p.title());
     m.put("documentNumber", p.documentNumber());
-    m.put("version", version == null ? "—" : version.versionLabel());
+    m.put("version", version == null ? "-" : version.versionLabel());
     m.put("state", p.state());
     m.put(
         "confidentiality",
@@ -386,11 +475,6 @@ final class PdfExporter {
     return "data:" + mime + ";base64," + Base64.getEncoder().encodeToString(template.logo());
   }
 
-  /** A numbered, anchored section heading, e.g. {@code <h2 id="sec-3">3. Prerequisites</h2>}. */
-  private static String h2str(int n) {
-    return "<h2 id=\"sec-" + n + "\">" + n + ". " + esc(SECTIONS[n - 1]) + "</h2>";
-  }
-
   /** The version history / change log table, newest first, with the authoring user per version. */
   private static String historyTable(
       List<ProcedureVersion> history,
@@ -409,15 +493,15 @@ final class PdfExporter {
     String currentId = cur == null ? "" : cur.id().toString();
     for (ProcedureVersion v : rows) {
       boolean current = v.id().toString().equals(currentId);
-      String note = v.summary() == null || v.summary().isBlank() ? "—" : v.summary();
-      String author = authorNames.getOrDefault(v.createdBy(), "—");
+      String note = v.summary() == null || v.summary().isBlank() ? "-" : v.summary();
+      String author = authorNames.getOrDefault(v.createdBy(), "-");
       sb.append("<tr><td>v")
           .append(esc(v.versionLabel()))
           .append(current ? " <span class=\"cur\">current</span>" : "")
           .append("</td><td>")
           .append(esc(DATE.format(v.createdAt())))
           .append("</td><td>")
-          .append(esc(author.isBlank() ? "—" : author))
+          .append(esc(author.isBlank() ? "-" : author))
           .append("</td><td>")
           .append(esc(note))
           .append("</td></tr>");
@@ -548,6 +632,13 @@ final class PdfExporter {
       case "listItem" -> wrap(n, sb, "li");
       case "blockquote" -> wrap(n, sb, "blockquote");
       case "codeBlock" -> appendCodeBlock(n, sb);
+      case "callout" -> {
+        sb.append("<div class=\"note note-")
+            .append(noteClass(n.path("attrs").path("noteType").asText("")))
+            .append("\">");
+        renderChildren(n, sb);
+        sb.append("</div>");
+      }
       case "horizontalRule" -> sb.append("<hr/>");
       case "hardBreak" -> sb.append("<br/>");
       case "attachmentRef" ->
@@ -641,10 +732,10 @@ final class PdfExporter {
       @Nullable DocTemplate template, @Nullable String confidentiality) {
     String footer =
         template == null || template.footerText() == null || template.footerText().isBlank()
-            ? "Controlled document — printed copies are uncontrolled."
-            : template.footerText() + "  —  Controlled document — printed copies are uncontrolled.";
+            ? "Controlled document - printed copies are uncontrolled."
+            : template.footerText() + " - Controlled document - printed copies are uncontrolled.";
     if (confidentiality != null && !confidentiality.isBlank()) {
-      footer = confidentiality.toUpperCase(Locale.ROOT) + "  —  " + footer;
+      footer = confidentiality.toUpperCase(Locale.ROOT) + " - " + footer;
     }
     return footer;
   }

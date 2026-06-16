@@ -183,10 +183,12 @@ export const qk = {
 	notifications: ['notifications'] as const,
 	exportTemplates: ['exportTemplates'] as const,
 	scriptBundleSettings: ['scriptBundleSettings'] as const,
+	sessionPolicy: ['sessionPolicy'] as const,
 	notificationPrefs: ['notificationPrefs'] as const,
 	scripts: ['scripts'] as const,
 	script: (id: string) => ['scripts', id] as const,
-	scriptVersions: (id: string) => ['scripts', id, 'versions'] as const
+	scriptVersions: (id: string) => ['scripts', id, 'versions'] as const,
+	procedureForm: ['procedureForm'] as const
 };
 
 // ---------------------------------------------------------------- queries
@@ -242,9 +244,85 @@ export function useSaveScriptBundleSettings() {
 	});
 }
 
+export type SessionPolicy = { idleTimeoutSeconds: number; absoluteTimeoutSeconds: number };
+
+export const useSessionPolicy = () =>
+	useQuery({
+		queryKey: qk.sessionPolicy,
+		queryFn: () => api.get<SessionPolicy>('/api/v1/session-policy')
+	});
+
+export function useSaveSessionPolicy() {
+	const qc = useQueryClient();
+	return useMutation({
+		mutationFn: (v: SessionPolicy) => api.put<SessionPolicy>('/api/v1/session-policy', v),
+		onSuccess: () => qc.invalidateQueries({ queryKey: qk.sessionPolicy })
+	});
+}
+
+// ---- custom procedure-form schema (tenant-defined flat list of fields/elements) ----
+export type FormField = {
+	id: string;
+	label: string;
+	type: string;
+	options: string;
+	required: boolean;
+	sortOrder: number;
+};
+export type ProcedureForm = { fields: FormField[] };
+
+export const useProcedureForm = () =>
+	useQuery({ queryKey: qk.procedureForm, queryFn: () => api.get<ProcedureForm>('/api/v1/procedure-form') });
+
+export function useCreateField() {
+	const qc = useQueryClient();
+	return useMutation({
+		mutationFn: (v: { label: string; type: string }) =>
+			api.post('/api/v1/procedure-form/fields', { label: v.label, type: v.type }),
+		onSuccess: () => qc.invalidateQueries({ queryKey: qk.procedureForm })
+	});
+}
+
+export function useUpdateField() {
+	const qc = useQueryClient();
+	return useMutation({
+		mutationFn: (v: {
+			id: string;
+			label?: string;
+			type?: string;
+			options?: string;
+			required?: boolean;
+			sortOrder?: number;
+		}) =>
+			api.put(`/api/v1/procedure-form/fields/${v.id}`, {
+				label: v.label,
+				type: v.type,
+				options: v.options,
+				required: v.required,
+				sortOrder: v.sortOrder
+			}),
+		onSuccess: () => qc.invalidateQueries({ queryKey: qk.procedureForm })
+	});
+}
+
+export function useDeleteField() {
+	const qc = useQueryClient();
+	return useMutation({
+		mutationFn: (id: string) => api.del(`/api/v1/procedure-form/fields/${id}`),
+		onSuccess: () => qc.invalidateQueries({ queryKey: qk.procedureForm })
+	});
+}
+
 // ---- scripts (proxied to the standalone script-service) ----
 export const useScripts = () =>
 	useQuery({ queryKey: qk.scripts, queryFn: () => api.get<ScriptRow[]>('/api/v1/scripts') });
+
+export const useScript = (id: string) =>
+	useQuery({
+		queryKey: qk.script(id),
+		queryFn: () => api.get<ScriptRow>(`/api/v1/scripts/${id}`),
+		enabled: !!id
+	});
 
 export const useScriptVersions = (id: string) =>
 	useQuery({
@@ -281,6 +359,17 @@ export function useSaveBody(id: string) {
 	return useMutation({
 		mutationFn: (body: string) => api.put(`/api/v1/procedures/${id}/body`, { body }),
 		onSuccess: () => qc.invalidateQueries({ queryKey: qk.procedure(id) })
+	});
+}
+
+export function useSetTitle(id: string) {
+	const qc = useQueryClient();
+	return useMutation({
+		mutationFn: (title: string) => api.put(`/api/v1/procedures/${id}/title`, { title }),
+		onSuccess: () => {
+			qc.invalidateQueries({ queryKey: qk.procedure(id) });
+			qc.invalidateQueries({ queryKey: qk.proceduresAll });
+		}
 	});
 }
 
@@ -585,7 +674,8 @@ export function useUpdateScriptMeta() {
 export function useSaveScriptContent(id: string) {
 	const qc = useQueryClient();
 	return useMutation({
-		mutationFn: (v: { content: string; note: string }) => api.put(`/api/v1/scripts/${id}/content`, v),
+		mutationFn: (v: { content: string; note: string }) =>
+			api.put<{ versionNo: number }>(`/api/v1/scripts/${id}/content`, v),
 		onSuccess: () => {
 			qc.invalidateQueries({ queryKey: qk.scripts });
 			qc.invalidateQueries({ queryKey: qk.script(id) });
@@ -596,7 +686,7 @@ export function useSaveScriptContent(id: string) {
 export function useRestoreScriptVersion(id: string) {
 	const qc = useQueryClient();
 	return useMutation({
-		mutationFn: (no: number) => api.post(`/api/v1/scripts/${id}/restore/${no}`),
+		mutationFn: (no: number) => api.post<{ versionNo: number }>(`/api/v1/scripts/${id}/restore/${no}`),
 		onSuccess: () => {
 			qc.invalidateQueries({ queryKey: qk.scripts });
 			qc.invalidateQueries({ queryKey: qk.script(id) });

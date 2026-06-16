@@ -2,7 +2,6 @@ import { useRef, useState, type ChangeEvent } from 'react';
 import {
 	Button,
 	Callout,
-	Card,
 	Checkbox,
 	Code,
 	Dialog,
@@ -15,6 +14,7 @@ import {
 	Spinner,
 	TextArea
 } from '@blueprintjs/core';
+import Panel from '../../components/Panel';
 import { ApiError, postBlob } from '../../lib/api';
 import { toast } from '../../lib/toaster';
 import {
@@ -176,8 +176,9 @@ export default function ExportTemplates() {
 					<Spinner />
 				</div>
 			) : (
-				<Card style={{ maxWidth: 860 }}>
-					<HTMLTable className="full">
+				<div>
+					<Panel flush>
+					<HTMLTable className="data-table full">
 						<thead>
 							<tr>
 								<th>Name</th>
@@ -308,7 +309,10 @@ export default function ExportTemplates() {
 						</tbody>
 					</HTMLTable>
 
-					<div style={{ display: 'flex', gap: 8, marginTop: 14, alignItems: 'center' }}>
+					<div
+						className="panel-body"
+						style={{ display: 'flex', gap: 8, alignItems: 'center', borderTop: '1px solid var(--border)', flexWrap: 'wrap' }}
+					>
 						<div style={{ flex: 1 }}>
 							<InputGroup fill placeholder="New template name (e.g. RightCrowd GMP)" value={neu.name} onChange={(e) => setNeu({ ...neu, name: e.currentTarget.value })} />
 						</div>
@@ -359,11 +363,12 @@ export default function ExportTemplates() {
 							<InputGroup fill placeholder="Footer (optional)" value={neu.footerText} onChange={(e) => setNeu({ ...neu, footerText: e.currentTarget.value })} />
 						</div>
 						<Button intent="primary" icon="add" loading={create.isPending} disabled={!neu.name.trim()} onClick={add} text="Add" />
+						<p className="muted" style={{ fontSize: 12, margin: 0, flexBasis: '100%' }}>
+							Add a template, then upload its logo with the <strong>↑</strong> button on its row.
+						</p>
 					</div>
-					<p className="muted" style={{ fontSize: 12, marginTop: 8 }}>
-						Add a template, then upload its logo with the <strong>↑</strong> button on its row.
-					</p>
-				</Card>
+					</Panel>
+				</div>
 			)}
 
 			{editing && editTemplate && (
@@ -577,7 +582,7 @@ function PageSetupDialog({
 						onChange={(e) => setCoverText(e.currentTarget.value)}
 						fill
 						style={{ minHeight: 120 }}
-						placeholder={'© 2026 RightCrowd\nControlled document — do not distribute.'}
+						placeholder={'© 2026 RightCrowd\nControlled document - do not distribute.'}
 					/>
 				</FormGroup>
 				<Callout intent="none" icon="code" style={{ marginTop: 4 }}>

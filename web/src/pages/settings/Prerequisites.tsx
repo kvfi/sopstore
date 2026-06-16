@@ -1,14 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import {
-	Button,
-	Callout,
-	Card,
-	HTMLSelect,
-	HTMLTable,
-	InputGroup,
-	Spinner
-} from '@blueprintjs/core';
+import { Button, Callout, HTMLSelect, HTMLTable, InputGroup, Spinner } from '@blueprintjs/core';
+import Panel from '../../components/Panel';
 import { ApiError } from '../../lib/api';
 import { toast } from '../../lib/toaster';
 import {
@@ -99,12 +92,13 @@ export default function Prerequisites() {
 			{types.length === 0 && (
 				<Callout intent="primary" icon="info-sign" style={{ marginBottom: 12, maxWidth: 720 }}>
 					No prerequisite types yet — add some under{' '}
-					<Link to="/settings/configuration/prerequisite-types">Prerequisite types</Link> first.
+					<Link to="/settings/prerequisite-types">Prerequisite types</Link> first.
 				</Callout>
 			)}
 
-			<Card style={{ maxWidth: 760 }}>
-				<HTMLTable className="full">
+			<div>
+				<Panel flush>
+				<HTMLTable className="data-table full">
 					<thead>
 						<tr>
 							<th style={{ width: 200 }}>Type</th>
@@ -157,7 +151,10 @@ export default function Prerequisites() {
 					</tbody>
 				</HTMLTable>
 
-				<div style={{ display: 'flex', gap: 8, marginTop: 14, alignItems: 'center' }}>
+				<div
+					className="panel-body"
+					style={{ display: 'flex', gap: 8, alignItems: 'center', borderTop: '1px solid var(--border)' }}
+				>
 					<HTMLSelect
 						value={newTypeValue}
 						options={typeOptions(types, newTypeValue)}
@@ -176,7 +173,8 @@ export default function Prerequisites() {
 					</div>
 					<Button intent="primary" icon="add" loading={createPrereq.isPending} disabled={!newText.trim()} onClick={add} text="Add" />
 				</div>
-			</Card>
+				</Panel>
+			</div>
 		</>
 	);
 }

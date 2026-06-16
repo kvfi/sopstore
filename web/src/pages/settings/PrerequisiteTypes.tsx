@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Button, Card, HTMLTable, InputGroup, Spinner } from '@blueprintjs/core';
+import { Button, HTMLTable, InputGroup, Spinner } from '@blueprintjs/core';
+import Panel from '../../components/Panel';
 import { ApiError } from '../../lib/api';
 import { toast } from '../../lib/toaster';
 import {
@@ -70,8 +71,9 @@ export default function PrerequisiteTypes() {
 					<Spinner />
 				</div>
 			) : (
-				<Card style={{ maxWidth: 640 }}>
-					<HTMLTable className="full">
+				<div>
+					<Panel flush>
+					<HTMLTable className="data-table full">
 						<thead>
 							<tr>
 								<th>Type</th>
@@ -112,7 +114,10 @@ export default function PrerequisiteTypes() {
 						</tbody>
 					</HTMLTable>
 
-					<div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
+					<div
+						className="panel-body"
+						style={{ display: 'flex', gap: 8, borderTop: '1px solid var(--border)' }}
+					>
 						<div style={{ flex: 1 }}>
 							<InputGroup
 								fill
@@ -126,7 +131,8 @@ export default function PrerequisiteTypes() {
 						</div>
 						<Button intent="primary" icon="add" loading={createType.isPending} disabled={!newName.trim()} onClick={add} text="Add type" />
 					</div>
-				</Card>
+					</Panel>
+				</div>
 			)}
 		</>
 	);

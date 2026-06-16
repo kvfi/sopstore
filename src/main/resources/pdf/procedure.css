@@ -34,6 +34,12 @@ body { margin: 0; }
 }
 /* Confidentiality marking in the document meta line. */
 .classification { color: #b3261e; font-weight: 700; letter-spacing: 0.05em; }
+/* Keep every heading with the content that follows it: never break right after a
+   heading (no orphaned heading at the foot of a page) and never split a heading. */
+h1, h2, h3, h4 {
+	page-break-after: avoid;
+	page-break-inside: avoid;
+}
 h1 { font-size: $H1PTpt; font-weight: 700; color: $ACCENT; margin: 4px 0 2px; }
 h2 {
 	font-size: $H2PTpt;
@@ -107,6 +113,31 @@ blockquote {
 	color: #3d4752;
 }
 .muted { color: #9aa0a8; font-style: italic; }
+/* per-section notes (info = blue, warning = amber, critical = red) */
+.note {
+	margin: 0 0 8px;
+	padding: 6px 11px;
+	border-left: 3px solid;
+	border-radius: 3px;
+	font-size: $FONTPTpt;
+	page-break-inside: avoid;
+}
+.note > :last-child { margin-bottom: 0; }
+.note-info {
+	background: #e8f1fb;
+	border-left-color: #2d6ac9;
+	color: #1b3a5b;
+}
+.note-warning {
+	background: #fdf3e3;
+	border-left-color: #c07a18;
+	color: #5b3d12;
+}
+.note-critical {
+	background: #fdecec;
+	border-left-color: #c0392b;
+	color: #5b1b1b;
+}
 .chip {
 	font-family: 'IBM Plex Mono', monospace;
 	font-size: 8.5pt;
@@ -116,7 +147,7 @@ blockquote {
 	padding: 1px 6px;
 }
 .step { margin: 0 0 12px; padding-bottom: 7px; border-bottom: 1px solid #eef0f2; }
-.step-h { margin-bottom: 3px; }
+.step-h { margin-bottom: 3px; page-break-after: avoid; page-break-inside: avoid; }
 .num {
 	display: inline-block;
 	width: 20px;

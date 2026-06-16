@@ -1,0 +1,103 @@
+/* =========================================================================
+   sopstore design tokens — refined enterprise (light)
+   Single source of truth for color, type, spacing, radius, elevation.
+   Existing --bp-* vars are remapped onto these so legacy CSS keeps working.
+   ========================================================================= */
+:root {
+	/* ---- Slate neutral scale ------------------------------------------- */
+	--slate-0: #ffffff;
+	--slate-25: #fbfcfe;
+	--slate-50: #f5f7fa;
+	--slate-100: #edf1f6;
+	--slate-150: #e4e9f0;
+	--slate-200: #d8dfe8;
+	--slate-300: #bcc6d3;
+	--slate-400: #94a2b4;
+	--slate-500: #6a7888;
+	--slate-600: #515d6b;
+	--slate-700: #3b4552;
+	--slate-800: #29313c;
+	--slate-900: #181e26;
+
+	/* ---- Primary — refined blue centered on the brand #215db0 ---------- */
+	--primary-50: #eef4fc;
+	--primary-100: #d8e6f8;
+	--primary-200: #b0caef;
+	--primary-300: #7ea9e4;
+	--primary-400: #4b85d7;
+	--primary-500: #2c6bca;
+	--primary-600: #215db0; /* brand mark */
+	--primary-700: #1b4c90;
+	--primary-800: #163c72;
+	--primary-900: #122e56;
+
+	/* ---- Semantic status (paired text + tint) ------------------------- */
+	--success: #1c6e42;
+	--success-bg: #e6f3ec;
+	--warning: #b56a16;
+	--warning-bg: #fbf0e0;
+	--danger: #b0383c;
+	--danger-bg: #fae9e9;
+	--info: #215db0;
+	--info-bg: #eaf1fb;
+
+	/* ---- Chart series (ordered, accessible on white) ------------------ */
+	--chart-1: #215db0;
+	--chart-2: #1c8a6e;
+	--chart-3: #c07a18;
+	--chart-4: #8a4fc4;
+	--chart-5: #b0383c;
+	--chart-6: #4b85d7;
+
+	/* ---- Typography ---------------------------------------------------- */
+	--font-ui:
+		'IBM Plex Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+	--font-mono: 'IBM Plex Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+
+	--fs-display: 30px;
+	--fs-h1: 21px;
+	--fs-h2: 16px;
+	--fs-h3: 13px;
+	--fs-body: 14px;
+	--fs-sm: 12.5px;
+	--fs-caption: 11px;
+
+	/* ---- Radius -------------------------------------------------------- */
+	--r-sm: 6px;
+	--r-md: 8px;
+	--r-lg: 12px;
+	--r-xl: 16px;
+	--r-pill: 999px;
+
+	/* ---- Spacing (4px base) ------------------------------------------- */
+	--sp-1: 4px;
+	--sp-2: 8px;
+	--sp-3: 12px;
+	--sp-4: 16px;
+	--sp-5: 20px;
+	--sp-6: 24px;
+	--sp-8: 32px;
+	--sp-10: 40px;
+
+	/* ---- Elevation ----------------------------------------------------- */
+	--shadow-card: 0 1px 2px rgba(16, 24, 40, 0.04), 0 1px 3px rgba(16, 24, 40, 0.07);
+	--shadow-raised:
+		0 4px 12px -2px rgba(16, 24, 40, 0.1), 0 2px 6px -2px rgba(16, 24, 40, 0.06);
+	--shadow-overlay: 0 16px 38px -10px rgba(16, 24, 40, 0.2);
+
+	/* ---- Semantic surface aliases ------------------------------------- */
+	--surface: var(--slate-0);
+	--surface-sunken: var(--slate-50);
+	--surface-hover: var(--slate-100);
+	--border: var(--slate-200);
+	--border-strong: var(--slate-300);
+	--text: var(--slate-800);
+	--text-muted: var(--slate-500);
+	--accent: var(--primary-600);
+	--accent-soft: var(--primary-50);
+
+	/* ---- Remap legacy app vars onto tokens ---------------------------- */
+	--bp-muted: var(--slate-500);
+	--bp-border: var(--slate-200);
+	--bp-bg: var(--slate-50);
+}

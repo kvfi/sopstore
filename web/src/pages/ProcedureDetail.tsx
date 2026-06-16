@@ -5,6 +5,7 @@ import {
 	Button,
 	Callout,
 	Card,
+	Checkbox,
 	Dialog,
 	DialogBody,
 	DialogFooter,
@@ -33,6 +34,8 @@ const PREREQ_MIME = 'application/x-prereq';
 const PREREQ_EXTENSIONS = [PrerequisiteRef];
 import {
 	type Att,
+	type FormField,
+	useProcedureForm,
 	useProcedureDetail,
 	useChangeRequests,
 	useProcedureBody,
@@ -42,6 +45,7 @@ import {
 	useExportTemplates,
 	useScripts,
 	useSaveBody,
+	useSetTitle,
 	useSetVersionLabel,
 	useSetDocumentNumber,
 	useConfidentialityLevels,
@@ -107,6 +111,21 @@ function randomRefId(taken: Set<string>): string {
 	return `r${Math.random().toString(36).slice(2, 6)}`;
 }
 
+/** Coerces a stored field (TipTap JSON object, legacy plain string, or empty) into editor content. */
+function asRich(v: unknown): object | null {
+	if (v && typeof v === 'object') return v as object;
+	if (typeof v === 'string' && v.trim()) {
+		return {
+			type: 'doc',
+			content: v.split('\n').map((line) => ({
+				type: 'paragraph',
+				content: line ? [{ type: 'text', text: line }] : []
+			}))
+		};
+	}
+	return null;
+}
+
 /** A TipTap doc counts as content if it has any text or an attachment reference. */
 function hasContent(node: unknown): boolean {
 	if (!node || typeof node !== 'object') return false;
@@ -158,12 +177,14 @@ export default function ProcedureDetail() {
 	const prereqLib = usePrereqLib().data ?? [];
 	const templates = useExportTemplates().data ?? [];
 	const repoScripts = useScripts().data ?? [];
+	const customForm = useProcedureForm().data?.fields ?? [];
 
 	const isAdmin = (useMe().data?.roles ?? []).includes('TENANT_ADMIN');
 
 	const confLevels = useConfidentialityLevels().data ?? [];
 
 	const saveBodyM = useSaveBody(id);
+	const setTitleM = useSetTitle(id);
 	const setVersionM = useSetVersionLabel(id);
 	const setDocNumM = useSetDocumentNumber(id);
 	const setConfM = useSetConfidentiality(id);
@@ -180,12 +201,17 @@ export default function ProcedureDetail() {
 	const [docNumDraft, setDocNumDraft] = useState<string | null>(null);
 	const docNumValue = docNumDraft ?? d?.documentNumber ?? '';
 
+	// title (procedure name) is editable while DRAFT. titleDraft null = not editing.
+	const [titleDraft, setTitleDraft] = useState<string | null>(null);
+
 	// structured document (editable locally, hydrated once from the body)
-	const [purpose, setPurpose] = useState('');
-	const [scope, setScope] = useState('');
+	const [purpose, setPurpose] = useState<object | null>(null);
+	const [scope, setScope] = useState<object | null>(null);
 	const [prereqDoc, setPrereqDoc] = useState<object | null>(null);
 	const [steps, setSteps] = useState<StepDraft[]>([]);
 	const [templateId, setTemplateId] = useState('');
+	// custom-field values keyed by field id (definitions come from the tenant's procedure-form schema)
+	const [customValues, setCustomValues] = useState<Record<string, unknown>>({});
 	const [viewScript, setViewScript] = useState<{ id: string; name: string; version: number; code: string } | null>(null);
 
 	// prerequisites picker: choose a type + requirement, then drag it into the text (or Insert)
@@ -218,8 +244,8 @@ export default function ProcedureDetail() {
 		} catch {
 			doc = {};
 		}
-		setPurpose(typeof doc.purpose === 'string' ? doc.purpose : '');
-		setScope(typeof doc.scope === 'string' ? doc.scope : '');
+		setPurpose(asRich(doc.purpose));
+		setScope(asRich(doc.scope));
 		setPrereqDoc(prereqsToDoc(doc.prerequisites));
 		setSteps(
 			Array.isArray(doc.steps)
@@ -244,6 +270,22 @@ export default function ProcedureDetail() {
 				: {}
 		);
 		setTemplateId(typeof doc.templateId === 'string' ? doc.templateId : '');
+		// Custom-field values live in the body as a self-contained snapshot; index them by field key
+		// so the live schema can prefill its inputs. Read the flat `customFields` and (for older
+		// procedures) the nested `customSections`.
+		const cv: Record<string, unknown> = {};
+		const indexFields = (arr: unknown) => {
+			if (Array.isArray(arr)) {
+				for (const f of arr as Record<string, unknown>[]) {
+					if (f && typeof f.key === 'string') cv[f.key] = f.value;
+				}
+			}
+		};
+		indexFields(doc.customFields);
+		if (Array.isArray(doc.customSections)) {
+			for (const sec of doc.customSections as Record<string, unknown>[]) indexFields(sec?.fields);
+		}
+		setCustomValues(cv);
 		setBodyReady(true);
 	}, [bodyQ.data, id]);
 
@@ -287,6 +329,7 @@ export default function ProcedureDetail() {
 
 	// mutators
 	const dirty = () => setBodyDirty(true);
+
 	const setPrereqContent = (json: object) => {
 		setPrereqDoc(json);
 		dirty();
@@ -376,8 +419,8 @@ export default function ProcedureDetail() {
 			const attachmentRefs: Record<string, string> = {};
 			for (const a of atts) if (attRefs[a.id]) attachmentRefs[a.id] = attRefs[a.id];
 			const doc = {
-				purpose: purpose.trim(),
-				scope: scope.trim(),
+				purpose,
+				scope,
 				prerequisites: prereqDoc,
 				steps: steps
 					.map((s) => {
@@ -396,13 +439,83 @@ export default function ProcedureDetail() {
 					})
 					.filter((s) => s.title || hasContent(s.description) || s.scriptRefId || s.scriptId),
 				attachmentRefs,
-				templateId
+				templateId,
+				// Snapshot the custom-field definitions + values so each saved version is self-contained
+				// (immune to later schema edits) and renders identically in the PDF.
+				customFields: customForm.map((f) => ({
+					key: f.id,
+					label: f.label,
+					type: f.type,
+					value:
+						customValues[f.id] ??
+						(f.type === 'CHECKBOX' ? false : f.type === 'RICHTEXT' ? null : '')
+				}))
 			};
 			await saveBodyM.mutateAsync(JSON.stringify(doc));
 			setBodyDirty(false);
 			toast('Content saved', 'success');
 		} catch (e) {
 			toast((e as Error).message, 'danger');
+		}
+	}
+
+	const setCustomVal = (fieldId: string, value: unknown) => {
+		setCustomValues((m) => ({ ...m, [fieldId]: value }));
+		dirty();
+	};
+
+	/** Renders the input for a non-checkbox custom field, driven by its type. */
+	function renderCustomField(f: FormField) {
+		const v = customValues[f.id];
+		switch (f.type) {
+			case 'RICHTEXT':
+				return (
+					<RichTextEditor
+						value={v && typeof v === 'object' ? (v as object) : null}
+						onChange={(json) => setCustomVal(f.id, json)}
+						disabled={!editable}
+					/>
+				);
+			case 'NUMBER':
+				return (
+					<input
+						type="number"
+						className="bp6-input"
+						disabled={!editable}
+						value={typeof v === 'number' || typeof v === 'string' ? String(v) : ''}
+						onChange={(e) => setCustomVal(f.id, e.currentTarget.value)}
+					/>
+				);
+			case 'DATE':
+				return (
+					<input
+						type="date"
+						className="bp6-input"
+						disabled={!editable}
+						value={typeof v === 'string' ? v : ''}
+						onChange={(e) => setCustomVal(f.id, e.currentTarget.value)}
+					/>
+				);
+			case 'SELECT': {
+				const opts = f.options.split('\n').map((o) => o.trim()).filter(Boolean);
+				return (
+					<HTMLSelect
+						disabled={!editable}
+						value={typeof v === 'string' ? v : ''}
+						onChange={(e) => setCustomVal(f.id, e.currentTarget.value)}
+						options={[{ value: '', label: '— select —' }, ...opts.map((o) => ({ value: o, label: o }))]}
+					/>
+				);
+			}
+			default:
+				return (
+					<InputGroup
+						fill
+						disabled={!editable}
+						value={typeof v === 'string' ? v : ''}
+						onChange={(e) => setCustomVal(f.id, e.currentTarget.value)}
+					/>
+				);
 		}
 	}
 
@@ -421,6 +534,21 @@ export default function ProcedureDetail() {
 			await setDocNumM.mutateAsync(docNumValue.trim());
 			setDocNumDraft(null);
 			toast('Document number updated', 'success');
+		} catch (e) {
+			toast((e as Error).message, 'danger');
+		}
+	}
+
+	async function saveTitle() {
+		const next = (titleDraft ?? '').trim();
+		if (!next || next === d?.title) {
+			setTitleDraft(null);
+			return;
+		}
+		try {
+			await setTitleM.mutateAsync(next);
+			setTitleDraft(null);
+			toast('Name updated', 'success');
 		} catch (e) {
 			toast((e as Error).message, 'danger');
 		}
@@ -502,8 +630,44 @@ export default function ProcedureDetail() {
 				← Procedures
 			</Link>
 			<div style={{ display: 'flex', alignItems: 'center', gap: 12, margin: '8px 0 2px' }}>
-				<h1 style={{ margin: 0, fontSize: 24, fontWeight: 700, letterSpacing: '-0.01em' }}>{d.title}</h1>
-				<Tag large intent={statusIntent(d.state)}>{d.state}</Tag>
+				{titleDraft !== null ? (
+					<>
+						<InputGroup
+							large
+							autoFocus
+							value={titleDraft}
+							style={{ flex: 1, maxWidth: 560 }}
+							onChange={(e) => setTitleDraft(e.currentTarget.value)}
+							onKeyDown={(e) => {
+								if (e.key === 'Enter') saveTitle();
+								if (e.key === 'Escape') setTitleDraft(null);
+							}}
+						/>
+						<Button
+							intent="primary"
+							loading={setTitleM.isPending}
+							disabled={!titleDraft.trim() || titleDraft.trim() === d.title}
+							onClick={saveTitle}
+							text="Save"
+						/>
+						<Button minimal onClick={() => setTitleDraft(null)} text="Cancel" />
+					</>
+				) : (
+					<>
+						<h1 style={{ margin: 0, fontSize: 24, fontWeight: 700, letterSpacing: '-0.01em' }}>{d.title}</h1>
+						{editable ? (
+							<Button
+								minimal
+								small
+								icon="edit"
+								aria-label="Edit name"
+								title="Edit name"
+								onClick={() => setTitleDraft(d.title)}
+							/>
+						) : null}
+						<Tag large intent={statusIntent(d.state)}>{d.state}</Tag>
+					</>
+				)}
 			</div>
 			<div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 2 }}>
 				{isAdmin ? (
@@ -640,17 +804,13 @@ export default function ProcedureDetail() {
 							<Tag round minimal intent="primary">01</Tag> Purpose
 						</div>
 						<p className="doc-hint">Why this procedure exists and what it sets out to achieve.</p>
-						<TextArea
-							fill
-							autoResize
-							disabled={!editable}
-							style={{ minHeight: 90 }}
+						<RichTextEditor
 							value={purpose}
-							onChange={(e) => {
-								setPurpose(e.currentTarget.value);
+							onChange={(json) => {
+								setPurpose(json);
 								dirty();
 							}}
-							placeholder="Describe the objective of this procedure…"
+							disabled={!editable}
 						/>
 					</div>
 
@@ -659,17 +819,13 @@ export default function ProcedureDetail() {
 							<Tag round minimal intent="primary">02</Tag> Scope
 						</div>
 						<p className="doc-hint">Who and what this applies to — roles, sites, systems, and any exclusions.</p>
-						<TextArea
-							fill
-							autoResize
-							disabled={!editable}
-							style={{ minHeight: 90 }}
+						<RichTextEditor
 							value={scope}
-							onChange={(e) => {
-								setScope(e.currentTarget.value);
+							onChange={(json) => {
+								setScope(json);
 								dirty();
 							}}
-							placeholder="Define the boundaries of this procedure…"
+							disabled={!editable}
 						/>
 					</div>
 
@@ -855,6 +1011,28 @@ export default function ProcedureDetail() {
 							<Button minimal intent="primary" icon="add" onClick={addStep} text="Add step" style={{ marginTop: 4 }} />
 						)}
 					</div>
+
+					{/* ---- custom elements (tenant-defined in Settings → Procedure form) ---- */}
+					{customForm.map((f, i) => (
+						<div className="doc-block" key={f.id}>
+							<div className="doc-eyebrow">
+								<Tag round minimal intent="primary">{String(5 + i).padStart(2, '0')}</Tag> {f.label}
+								{f.required ? (
+									<span className="doc-hint" style={{ margin: 0 }}>(required)</span>
+								) : null}
+							</div>
+							{f.type === 'CHECKBOX' ? (
+								<Checkbox
+									disabled={!editable}
+									checked={customValues[f.id] === true}
+									onChange={(e) => setCustomVal(f.id, e.currentTarget.checked)}
+									label="Yes"
+								/>
+							) : (
+								renderCustomField(f)
+							)}
+						</div>
+					))}
 				</Card>
 			)}
 

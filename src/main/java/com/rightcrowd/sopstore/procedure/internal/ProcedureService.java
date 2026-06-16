@@ -124,6 +124,23 @@ public class ProcedureService {
   }
 
   /**
+   * Renames a procedure's human-readable title. The new title is trimmed, must be non-blank, and at
+   * most 200 characters.
+   */
+  public Procedure rename(UUID procedureId, String newTitle) {
+    String trimmed = newTitle == null ? "" : newTitle.trim();
+    if (trimmed.isEmpty()) {
+      throw new IllegalArgumentException("title must not be blank");
+    }
+    if (trimmed.length() > 200) {
+      throw new IllegalArgumentException("title must be at most 200 characters");
+    }
+    Procedure p = procedures.findById(procedureId).orElseThrow();
+    p.setTitle(trimmed);
+    return procedures.save(p);
+  }
+
+  /**
    * Classifies a procedure with a confidentiality level (or clears it when {@code levelId} null).
    * A non-null level must exist in the tenant's catalogue.
    */
